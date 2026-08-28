@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'OVERTIME_ALERT';
+
+-- AlterTable
+ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "estimatedHours" DOUBLE PRECISION;

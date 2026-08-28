@@ -1,0 +1,510 @@
+// ============================================================
+// Workforce Management System — Prisma Schema
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum ClockStatus {
+  WORKING
+  ON_BREAK
+  OFFLINE
+}
+
+enum ClockSource {
+  WEB
+  MOBILE
+  MANUAL
+  ADMIN
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  VACATION
+  SICK
+  REMOTE
+  HOLIDAY
+  HALF_DAY
+}
+
+enum LeaveType {
+  VACATION
+  SICK
+  PERSONAL
+  HALF_DAY
+  WORK_FROM_HOME
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  CLOCK_IN_REMINDER
+  CLOCK_OUT_REMINDER
+  BREAK_REMINDER
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  NEW_TASK
+  UPCOMING_SHIFT
+  CORRECTION_UPDATE
+  OVERTIME_ALERT
+  SYSTEM
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+// ------------------------------------------------------------
+// Auth
+// ------------------------------------------------------------
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  role              Role      @default(EMPLOYEE)
+  emailVerified     DateTime?
+  image             String?
+  isActive          Boolean   @default(true)
+  lastLoginAt       DateTime?
+
+  employee          Employee?
+
+  passwordResetTokens PasswordResetToken[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([email])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+// ------------------------------------------------------------
+// Organization
+// ------------------------------------------------------------
+
+model Department {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  managerId   String?
+  manager     Employee?  @relation("DepartmentManager", fields: [managerId], references: [id])
+
+  employees   Employee[] @relation("DepartmentEmployees")
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Employee {
+  id                String         @id @default(cuid())
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  employeeCode      String         @unique
+  firstName         String
+  lastName          String
+  phone             String?
+  position          String
+  employmentType    EmploymentType @default(FULL_TIME)
+  hireDate          DateTime
+  weeklyHours       Float          @default(40)
+  vacationAllowance Float          @default(20)
+  status            EmployeeStatus @default(ACTIVE)
+  avatarUrl         String?
+
+  departmentId      String?
+  department        Department?    @relation("DepartmentEmployees", fields: [departmentId], references: [id])
+  managesDepartment Department[]   @relation("DepartmentManager")
+
+  managerId         String?
+  manager           Employee?      @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports     Employee[]     @relation("EmployeeManager")
+
+  clockEntries      ClockEntry[]
+  attendances       Attendance[]
+  leaveRequests     LeaveRequest[]
+  reviewedLeaves    LeaveRequest[] @relation("LeaveReviewer")
+  shifts            Shift[]
+  corrections       CorrectionRequest[]
+  reviewedCorrections CorrectionRequest[] @relation("CorrectionReviewer")
+  tasksAssigned     Task[]         @relation("TaskAssignee")
+  tasksCreated      Task[]         @relation("TaskCreator")
+  projectMembers    ProjectMember[]
+  taskTimeEntries   TaskTimeEntry[]
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([status])
+}
+
+// ------------------------------------------------------------
+// Time Tracking
+// ------------------------------------------------------------
+
+model ClockEntry {
+  id            String       @id @default(cuid())
+  employeeId    String
+  employee      Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  clockIn       DateTime
+  clockOut      DateTime?
+  source        ClockSource  @default(WEB)
+  note          String?
+
+  breaks        Break[]
+
+  attendanceId  String?
+  attendance    Attendance?  @relation(fields: [attendanceId], references: [id])
+
+  editedById    String?
+  isEdited      Boolean      @default(false)
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([employeeId, clockIn])
+  @@index([attendanceId])
+}
+
+model Break {
+  id            String     @id @default(cuid())
+  clockEntryId  String
+  clockEntry    ClockEntry @relation(fields: [clockEntryId], references: [id], onDelete: Cascade)
+
+  startedAt     DateTime
+  endedAt       DateTime?
+  reason        String?
+
+  createdAt     DateTime   @default(now())
+
+  @@index([clockEntryId])
+}
+
+model Attendance {
+  id            String           @id @default(cuid())
+  employeeId    String
+  employee      Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  date          DateTime
+  status        AttendanceStatus @default(PRESENT)
+  totalWorkedMinutes Int         @default(0)
+  breakMinutes  Int              @default(0)
+  overtimeMinutes Int            @default(0)
+  note          String?
+
+  clockEntries  ClockEntry[]
+  corrections   CorrectionRequest[]
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([employeeId, date])
+  @@index([status])
+}
+
+model CorrectionRequest {
+  id            String           @id @default(cuid())
+  employeeId    String
+  employee      Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  attendanceId  String
+  attendance    Attendance       @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  requestedClockIn  DateTime?
+  requestedClockOut DateTime?
+  reason        String
+  status        CorrectionStatus @default(PENDING)
+
+  reviewedById  String?
+  reviewer      Employee?        @relation("CorrectionReviewer", fields: [reviewedById], references: [id])
+  reviewComment String?
+  reviewedAt    DateTime?
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([employeeId])
+  @@index([attendanceId])
+  @@index([status])
+}
+
+// ------------------------------------------------------------
+// Leave Management
+// ------------------------------------------------------------
+
+model LeaveRequest {
+  id            String      @id @default(cuid())
+  employeeId    String
+  employee      Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type          LeaveType
+  startDate     DateTime
+  endDate       DateTime
+  totalDays     Float
+  reason        String?
+  status        LeaveStatus @default(PENDING)
+
+  reviewedById  String?
+  reviewer      Employee?   @relation("LeaveReviewer", fields: [reviewedById], references: [id])
+  reviewComment String?
+  reviewedAt    DateTime?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+// ------------------------------------------------------------
+// Scheduling
+// ------------------------------------------------------------
+
+model Shift {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  title       String
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  note        String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([employeeId, startTime])
+}
+
+model Holiday {
+  id      String   @id @default(cuid())
+  name    String
+  date    DateTime
+  isPaid  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@unique([date, name])
+  @@index([date])
+}
+
+// ------------------------------------------------------------
+// Projects & Tasks (used for "New Task" notifications, utilization)
+// ------------------------------------------------------------
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+
+  members     ProjectMember[]
+  tasks       Task[]
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model ProjectMember {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([projectId, employeeId])
+}
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(MEDIUM)
+  dueDate      DateTime?
+  estimatedHours Float?
+
+  projectId    String?
+  project      Project?     @relation(fields: [projectId], references: [id])
+
+  assigneeId   String?
+  assignee     Employee?    @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  createdById  String
+  createdBy    Employee     @relation("TaskCreator", fields: [createdById], references: [id])
+
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  timeEntries  TaskTimeEntry[]
+
+  @@index([assigneeId])
+  @@index([status])
+}
+
+model TaskTimeEntry {
+  id              String    @id @default(cuid())
+  taskId          String
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  durationSeconds Int?
+
+  createdAt       DateTime  @default(now())
+
+  @@index([taskId])
+  @@index([employeeId, endedAt])
+}
+
+// ------------------------------------------------------------
+// Notifications
+// ------------------------------------------------------------
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  link      String?
+
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+}
+
+// ------------------------------------------------------------
+// Company Settings
+// ------------------------------------------------------------
+
+model CompanySettings {
+  id                    String   @id @default("global")
+  companyName           String   @default("My Company")
+  logoUrl               String?
+  timezone              String   @default("UTC")
+  workDayStartTime      String   @default("09:00")
+  workDayEndTime        String   @default("17:00")
+  standardWeeklyHours   Float    @default(40)
+  breakDurationMinutes  Int      @default(30)
+  maxBreaksPerDay       Int      @default(2)
+  overtimeThresholdDaily Float   @default(8)
+  overtimeMultiplier    Float    @default(1.5)
+  defaultVacationDays   Float    @default(20)
+  notifyClockInReminder Boolean  @default(true)
+  notifyClockOutReminder Boolean @default(true)
+  notifyBreakReminder   Boolean  @default(true)
+  notifyLeaveUpdates    Boolean  @default(true)
+
+  updatedAt             DateTime @updatedAt
+}
+
+// ------------------------------------------------------------
+// Audit Log
+// ------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

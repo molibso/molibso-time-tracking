@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  molibso Brand Guidelines 2026
+  Cyan #40c0f0 · Petrol #00425a · Deep Petrol #000000
+  Smart #0498af · Sani #36b5ae · Montserrat
+  UX inspired by Personio: airy canvas, soft surfaces, calm HR SaaS chrome
+*/
+:root {
+  --background: 200 25% 97%;
+  --foreground: 195 100% 12%;
+  --surface: 0 0% 100%;
+  --surface-hover: 200 20% 96%;
+  --border: 200 18% 90%;
+  --muted: 200 18% 94%;
+  --muted-foreground: 195 12% 42%;
+
+  /* Brand cyan — accents, links, active states */
+  --primary: 197 85% 60%;
+  --primary-foreground: 195 100% 12%;
+
+  /* Brand petrol — solid CTAs, auth, emphasis (Personio-like dark actions) */
+  --petrol: 195 100% 18%;
+  --petrol-foreground: 0 0% 100%;
+
+  /* Secondary brand */
+  --smart: 188 96% 35%;
+  --sani: 176 54% 46%;
+
+  --success: 152 55% 38%;
+  --warning: 38 92% 48%;
+  --danger: 350 72% 52%;
+  --info: 197 85% 48%;
+
+  --radius: 1rem;
+}
+
+.dark {
+  --background: 195 40% 6%;
+  --foreground: 200 20% 96%;
+  --surface: 195 30% 9%;
+  --surface-hover: 195 24% 13%;
+  --border: 195 18% 18%;
+  --muted: 195 20% 14%;
+  --muted-foreground: 200 12% 62%;
+  --primary: 197 85% 60%;
+  --primary-foreground: 195 100% 10%;
+  --petrol: 197 70% 55%;
+  --petrol-foreground: 195 100% 10%;
+  --smart: 188 70% 45%;
+  --sani: 176 50% 50%;
+  --success: 152 50% 46%;
+  --warning: 38 92% 55%;
+  --danger: 350 70% 58%;
+  --info: 197 85% 55%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  background-image:
+    radial-gradient(ellipse 80% 50% at 100% -10%, hsl(197 85% 60% / 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 0% 100%, hsl(195 100% 18% / 0.04), transparent);
+  background-attachment: fixed;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.35);
+}
+
+.status-dot {
+  box-shadow: 0 0 0 3px hsl(var(--surface));
+}
+
+@layer utilities {
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .brand-gradient {
+    background: linear-gradient(180deg, #00425a 0%, #000000 100%);
+  }
+
+  .brand-gradient-soft {
+    background: linear-gradient(160deg, #00425a 0%, #0498af 55%, #40c0f0 100%);
+  }
+}
