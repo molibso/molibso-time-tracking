@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export function CompanySettingsForm({ defaultValues }: { defaultValues: CompanySettingsInput }) {
   const router = useRouter();
+  const { t } = useLocale();
   const {
     register,
     handleSubmit,
@@ -42,7 +44,7 @@ export function CompanySettingsForm({ defaultValues }: { defaultValues: CompanyS
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="timezone">Timezone</Label>
-            <Input id="timezone" placeholder="e.g. America/New_York" {...register("timezone")} />
+            <Input id="timezone" placeholder={t("ph.timezone")} {...register("timezone")} />
           </div>
         </div>
       </section>
@@ -65,10 +67,6 @@ export function CompanySettingsForm({ defaultValues }: { defaultValues: CompanyS
           <div className="space-y-1.5">
             <Label htmlFor="overtimeThresholdDaily">Overtime after (hrs/day)</Label>
             <Input id="overtimeThresholdDaily" type="number" step="0.5" {...register("overtimeThresholdDaily")} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="overtimeMultiplier">Overtime multiplier</Label>
-            <Input id="overtimeMultiplier" type="number" step="0.1" {...register("overtimeMultiplier")} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="defaultVacationDays">Default vacation days/yr</Label>
@@ -99,6 +97,7 @@ export function CompanySettingsForm({ defaultValues }: { defaultValues: CompanyS
             ["notifyClockOutReminder", "Clock-out reminder"],
             ["notifyBreakReminder", "Break reminder"],
             ["notifyLeaveUpdates", "Leave approval updates"],
+            ["notifyOvertimeAlert", "Overtime alert (over 1 hour)"],
           ] as const
         ).map(([name, label]) => (
           <div key={name} className="flex items-center justify-between">

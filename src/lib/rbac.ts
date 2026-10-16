@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import type { Role } from "@prisma/client";
 
 /**
  * Flat hierarchy for a small team:
@@ -7,19 +7,19 @@ import { Role } from "@prisma/client";
  * MANAGER is kept in the schema for compatibility but treated as ADMIN.
  */
 export function effectiveRole(role: Role | undefined): Role {
-  if (role === Role.MANAGER || role === Role.ADMIN) return Role.ADMIN;
-  return Role.EMPLOYEE;
+  if (role === "MANAGER" || role === "ADMIN") return "ADMIN";
+  return "EMPLOYEE";
 }
 
 export const PERMISSIONS = {
-  EMPLOYEE_MANAGE: [Role.ADMIN],
-  EMPLOYEE_VIEW_ALL: [Role.ADMIN],
-  LEAVE_APPROVE: [Role.ADMIN],
-  ATTENDANCE_EDIT: [Role.ADMIN],
-  SETTINGS_MANAGE: [Role.ADMIN],
-  ANALYTICS_VIEW: [Role.ADMIN],
-  AUDIT_VIEW: [Role.ADMIN],
-} as const;
+  EMPLOYEE_MANAGE: ["ADMIN"],
+  EMPLOYEE_VIEW_ALL: ["ADMIN"],
+  LEAVE_APPROVE: ["ADMIN"],
+  ATTENDANCE_EDIT: ["ADMIN"],
+  SETTINGS_MANAGE: ["ADMIN"],
+  ANALYTICS_VIEW: ["ADMIN"],
+  AUDIT_VIEW: ["ADMIN"],
+} as const satisfies Record<string, readonly Role[]>;
 
 export type PermissionKey = keyof typeof PERMISSIONS;
 
@@ -29,7 +29,7 @@ export function hasPermission(role: Role | undefined, permission: PermissionKey)
 }
 
 export function isAdmin(role?: Role): boolean {
-  return effectiveRole(role) === Role.ADMIN;
+  return effectiveRole(role) === "ADMIN";
 }
 
 export function isBoss(role?: Role): boolean {
@@ -42,9 +42,9 @@ export function isManagerOrAbove(role?: Role): boolean {
 }
 
 export const ROUTE_ACCESS: { prefix: string; roles: Role[] }[] = [
-  { prefix: "/employees", roles: [Role.ADMIN] },
-  { prefix: "/settings", roles: [Role.ADMIN] },
-  { prefix: "/analytics", roles: [Role.ADMIN] },
+  { prefix: "/employees", roles: ["ADMIN"] },
+  { prefix: "/settings", roles: ["ADMIN"] },
+  { prefix: "/analytics", roles: ["ADMIN"] },
 ];
 
 export function canAccessRoute(pathname: string, role?: Role): boolean {

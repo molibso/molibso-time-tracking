@@ -84,6 +84,15 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        // Keep left-1/2 top-1/2 centering; plain translateY would wipe -translate-x/y-1/2.
+        "dialog-in": {
+          from: { opacity: "0", transform: "translate(-50%, calc(-50% + 8px))" },
+          to: { opacity: "1", transform: "translate(-50%, -50%)" },
+        },
+        "slide-up-x": {
+          from: { opacity: "0", transform: "translate(-50%, 10px)" },
+          to: { opacity: "1", transform: "translate(-50%, 0)" },
+        },
         "fade-in": {
           from: { opacity: "0" },
           to: { opacity: "1" },
@@ -92,6 +101,8 @@ const config: Config = {
       animation: {
         "pulse-dot": "pulse-dot 2s ease-in-out infinite",
         "slide-up": "slide-up 0.35s ease-out",
+        "dialog-in": "dialog-in 0.2s ease-out",
+        "slide-up-x": "slide-up-x 0.35s ease-out",
         "fade-in": "fade-in 0.25s ease-out",
       },
     },

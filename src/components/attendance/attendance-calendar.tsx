@@ -3,35 +3,61 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
+import { useLocale } from "@/components/layout/locale-provider";
+import { intlLocale, type MessageKey } from "@/lib/i18n/messages";
 
 export interface AttendanceDay {
-  date: string; // ISO yyyy-mm-dd
+  date: string; // local yyyy-mm-dd
   status: "PRESENT" | "ABSENT" | "VACATION" | "SICK" | "REMOTE" | "HOLIDAY" | "HALF_DAY";
+  workedSeconds: number;
 }
 
-const STATUS_STYLE: Record<AttendanceDay["status"], string> = {
-  PRESENT: "bg-success/15 text-success border-success/30",
-  ABSENT: "bg-danger/15 text-danger border-danger/30",
+/** A present day is green only after a full 8 hours. Shorter present days are reddish. */
+const FULL_DAY_SECONDS = 8 * 60 * 60;
+
+const FULL_DAY_STYLE = "bg-success/15 text-success border-success/30";
+const SHORT_DAY_STYLE = "bg-danger/15 text-danger border-danger/30";
+
+const STATUS_STYLE: Record<Exclude<AttendanceDay["status"], "PRESENT">, string> = {
+  ABSENT: "bg-petrol/10 text-petrol border-petrol/25",
   VACATION: "bg-primary/15 text-primary border-primary/30",
   SICK: "bg-warning/15 text-warning border-warning/30",
-  REMOTE: "bg-info/15 text-info border-info/30",
-  HOLIDAY: "bg-muted text-muted-foreground border-border",
-  HALF_DAY: "bg-primary/10 text-primary border-primary/20",
+  REMOTE: "bg-smart/15 text-smart border-smart/30",
+  HOLIDAY: "bg-sani/15 text-sani border-sani/30",
+  HALF_DAY: "bg-info/15 text-info border-info/30",
 };
 
-const LEGEND: { label: string; status: AttendanceDay["status"] }[] = [
-  { label: "Present", status: "PRESENT" },
-  { label: "Absent", status: "ABSENT" },
-  { label: "Vacation", status: "VACATION" },
-  { label: "Sick", status: "SICK" },
-  { label: "Remote", status: "REMOTE" },
-  { label: "Holiday", status: "HOLIDAY" },
+const LEGEND: { labelKey: MessageKey; className: string }[] = [
+  { labelKey: "attendance.fullDay", className: FULL_DAY_STYLE },
+  { labelKey: "attendance.shortDay", className: SHORT_DAY_STYLE },
+  { labelKey: "attendance.absent", className: STATUS_STYLE.ABSENT },
+  { labelKey: "attendance.vacation", className: STATUS_STYLE.VACATION },
+  { labelKey: "attendance.sick", className: STATUS_STYLE.SICK },
+  { labelKey: "attendance.remote", className: STATUS_STYLE.REMOTE },
+  { labelKey: "attendance.holiday", className: STATUS_STYLE.HOLIDAY },
+  { labelKey: "attendance.halfDay", className: STATUS_STYLE.HALF_DAY },
 ];
+
+function cellStyle(day: AttendanceDay): string {
+  if (day.status === "PRESENT") return day.workedSeconds > FULL_DAY_SECONDS ? FULL_DAY_STYLE : SHORT_DAY_STYLE;
+  return STATUS_STYLE[day.status];
+}
+
+function compactDuration(totalSeconds: number): string {
+  const abs = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(abs / 3600);
+  const minutes = Math.floor((abs % 3600) / 60);
+  const seconds = abs % 60;
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutes > 0) return seconds > 0 ? `${minutes}m ${String(seconds).padStart(2, "0")}s` : `${minutes}m`;
+  return `${seconds}s`;
+}
 
 export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
   const [cursor, setCursor] = useState(new Date());
-  const map = new Map(days.map((d) => [d.date, d.status]));
+  const { t, locale } = useLocale();
+  const map = new Map(days.map((d) => [d.date, d]));
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -50,8 +76,8 @@ export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="font-medium">
-          {cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+        <h3 className="text-xl font-medium">
+          {cursor.toLocaleDateString(intlLocale(locale), { month: "long", year: "numeric" })}
         </h3>
         <div className="flex gap-1">
           <Button variant="outline" size="icon" onClick={() => setCursor(new Date(year, month - 1, 1))}>
@@ -63,35 +89,42 @@ export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5 text-center text-xs text-muted-foreground mb-1.5">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div key={d}>{d}</div>
-        ))}
+      <div className="mb-3 grid grid-cols-7 gap-3 text-center text-sm font-medium text-muted-foreground">
+        {Array.from({ length: 7 }, (_, index) => {
+          const date = new Date(2026, 0, 5 + index);
+          const label = date.toLocaleDateString(intlLocale(locale), { weekday: "short" });
+          return <div key={index}>{label}</div>;
+        })}
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-3">
         {cells.map((day, i) => {
           if (!day) return <div key={i} />;
-          const status = map.get(key(day));
+          const entry = map.get(key(day));
+          const showTime = entry != null && (entry.workedSeconds > 0 || entry.status === "PRESENT");
           return (
             <div
               key={i}
+              title={entry && showTime ? formatDuration(entry.workedSeconds) : undefined}
               className={cn(
-                "flex aspect-square items-center justify-center rounded-lg border text-sm font-medium",
-                status ? STATUS_STYLE[status] : "border-border text-foreground/70"
+                "flex min-h-[8.5rem] flex-col items-center justify-center gap-1.5 rounded-xl border px-1.5 py-3",
+                entry ? cellStyle(entry) : "border-border text-foreground/70",
               )}
             >
-              {day}
+              <span className="text-lg font-medium leading-none">{day}</span>
+              {showTime && entry && (
+                <span className="text-sm font-medium leading-tight tabular-nums">{compactDuration(entry.workedSeconds)}</span>
+              )}
             </div>
           );
         })}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3">
-        {LEGEND.map((l) => (
-          <div key={l.status} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className={cn("h-2.5 w-2.5 rounded-full border", STATUS_STYLE[l.status])} />
-            {l.label}
+        {LEGEND.map((item) => (
+          <div key={item.labelKey} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className={cn("h-2.5 w-2.5 rounded-full border", item.className)} />
+            {t(item.labelKey)}
           </div>
         ))}
       </div>

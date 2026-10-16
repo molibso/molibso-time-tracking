@@ -10,6 +10,7 @@ import { departmentSchema, type DepartmentInput } from "@/lib/validations/settin
 import { createDepartment, deleteDepartment } from "@/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export interface DepartmentRow {
   id: string;
@@ -20,6 +21,7 @@ export interface DepartmentRow {
 
 export function DepartmentManager({ departments }: { departments: DepartmentRow[] }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [isPending, startTransition] = useTransition();
   const {
     register,
@@ -55,10 +57,10 @@ export function DepartmentManager({ departments }: { departments: DepartmentRow[
     <div className="space-y-4">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-wrap items-end gap-2">
         <div className="flex-1 min-w-[160px] space-y-1">
-          <Input placeholder="New department name" {...register("name")} />
+          <Input placeholder={t("ph.departmentName")} {...register("name")} />
           {errors.name && <p className="text-xs text-danger">{errors.name.message}</p>}
         </div>
-        <Input placeholder="Description (optional)" className="flex-1 min-w-[160px]" {...register("description")} />
+        <Input placeholder={t("ph.departmentDescription")} className="flex-1 min-w-[160px]" {...register("description")} />
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           Add

@@ -12,7 +12,7 @@ export async function GET() {
         data: {
           status: "ok",
           database: "mock",
-          message: "USE_MOCK_DATA=true — switch off for Supabase",
+          message: "USE_MOCK_DATA=true — switch off for PostgreSQL",
         },
       });
     }
@@ -27,7 +27,7 @@ export async function GET() {
       success: true,
       data: {
         status: "ok",
-        database: "supabase-postgresql",
+        database: "postgresql",
         userCount,
         employeeCount,
       },
@@ -35,7 +35,7 @@ export async function GET() {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Database connection failed";
     return NextResponse.json(
-      { success: false, error: message, data: { status: "error", database: "supabase-postgresql" } },
+      { success: false, error: message, data: { status: "error", database: "postgresql" } },
       { status: 503 },
     );
   }

@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
-import { getRoleView } from "@/lib/role-views";
+import { effectiveRole, hasPermission } from "@/lib/rbac";
 import { getVisibleEmployeeIds, leaveEmployeeIdsWhere } from "@/lib/role-scope";
 import { resolveTeamView } from "@/lib/team-view";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +11,8 @@ import { MyLeaveTable, type MyLeaveRow } from "@/components/leave/my-leave-table
 import { LeaveApprovals, type PendingLeaveRow } from "@/components/leave/leave-approvals";
 import { TeamMemberSelect } from "@/components/layout/team-member-select";
 import { RoleBadge } from "@/components/layout/role-badge";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { translate } from "@/lib/i18n/messages";
 
 export default async function LeavePage({
   searchParams,
@@ -25,7 +26,8 @@ export default async function LeavePage({
 
   const { employeeId: requestedId } = await searchParams;
   const role = session.user.role;
-  const roleView = getRoleView(role);
+  const locale = await getLocale();
+  const boss = effectiveRole(role) === "ADMIN";
   const canApprove = hasPermission(role, "LEAVE_APPROVE");
 
   const view = await resolveTeamView({
@@ -75,11 +77,13 @@ export default async function LeavePage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Leave</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{translate(locale, "leave.title")}</h1>
             <RoleBadge role={role} />
           </div>
           <p className="text-sm text-muted-foreground">
-            {view.isSelf ? roleView.pageCopy.leave : `Leave requests for ${view.viewedName}.`}
+            {view.isSelf
+              ? translate(locale, boss ? "leave.subtitleBoss" : "leave.subtitle")
+              : translate(locale, "leave.forName", { name: view.viewedName })}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
@@ -92,10 +96,10 @@ export default async function LeavePage({
         <Tabs defaultValue="person">
           <TabsList>
             <TabsTrigger value="person">
-              {view.isSelf ? "My requests" : `${view.viewedName}'s requests`}
+              {view.isSelf ? translate(locale, "leave.myRequests") : translate(locale, "leave.theirRequests", { name: view.viewedName })}
             </TabsTrigger>
             <TabsTrigger value="approvals">
-              Approvals {pendingRows.length > 0 && `(${pendingRows.length})`}
+              {translate(locale, "leave.approvals")} {pendingRows.length > 0 && `(${pendingRows.length})`}
             </TabsTrigger>
           </TabsList>
           <TabsContent value="person">

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notifyAdminsOfOvertime } from "@/lib/notifications";
-import { minutesBetween } from "@/lib/utils";
+import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
 
 export async function getOrCreateTodayAttendance(employeeId: string) {
   const date = new Date();
@@ -27,22 +27,12 @@ export async function recalculateAttendanceTotals(attendanceId: string) {
     include: { breaks: true },
   });
 
-  let workedMinutes = 0;
-  let breakMinutes = 0;
+  const closed = entries.filter((entry) => entry.clockOut);
+  const workedSeconds = sumWorkedSeconds(closed);
+  const breakSeconds = sumBreakSeconds(closed);
 
-  for (const entry of entries) {
-    if (entry.clockOut) {
-      workedMinutes += minutesBetween(entry.clockIn, entry.clockOut);
-    }
-    for (const b of entry.breaks) {
-      if (b.endedAt) {
-        const dur = minutesBetween(b.startedAt, b.endedAt);
-        breakMinutes += dur;
-        workedMinutes -= dur;
-      }
-    }
-  }
-
+  const workedMinutes = Math.round(workedSeconds / 60);
+  const breakMinutes = Math.round(breakSeconds / 60);
   const overtimeMinutes = Math.max(0, workedMinutes - overtimeThresholdMinutes);
 
   const updated = await prisma.attendance.update({

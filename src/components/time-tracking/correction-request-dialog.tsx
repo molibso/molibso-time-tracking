@@ -21,9 +21,11 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export function CorrectionRequestDialog({ attendanceId, date }: { attendanceId: string; date: string }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const {
     register,
@@ -73,7 +75,7 @@ export function CorrectionRequestDialog({ attendanceId, date }: { attendanceId: 
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="reason">Reason</Label>
-            <Textarea id="reason" placeholder="E.g. forgot to clock out after the client call" {...register("reason")} />
+            <Textarea id="reason" placeholder={t("ph.forgotClockOut")} {...register("reason")} />
             {errors.reason && <p className="text-xs text-danger">{errors.reason.message}</p>}
           </div>
           <DialogFooter>

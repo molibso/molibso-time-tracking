@@ -1,4 +1,8 @@
+"use client";
+
 import { Role } from "@prisma/client";
+import { useLocale } from "@/components/layout/locale-provider";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { isBoss } from "@/lib/rbac";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +18,7 @@ export function PendingActionsCard({
   pendingCorrections: number;
 }) {
   const total = pendingLeave + pendingCorrections;
+  const { t } = useLocale();
   if (total === 0) return null;
 
   return (
@@ -21,19 +26,25 @@ export function PendingActionsCard({
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <ClipboardCheck className="h-4 w-4 text-warning" />
-          Pending approvals
+          {t("dashboard.pending")}
           <Badge variant="warning">{total}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
         {pendingLeave > 0 && (
           <Button variant="outline" size="sm" asChild>
-            <Link href="/leave">{pendingLeave} leave request{pendingLeave !== 1 ? "s" : ""}</Link>
+            <Link href="/leave">
+              {t(pendingLeave === 1 ? "dashboard.leaveRequests" : "dashboard.leaveRequestsPlural", { count: pendingLeave })}
+            </Link>
           </Button>
         )}
         {pendingCorrections > 0 && (
           <Button variant="outline" size="sm" asChild>
-            <Link href="/attendance">{pendingCorrections} time correction{pendingCorrections !== 1 ? "s" : ""}</Link>
+            <Link href="/attendance">
+              {t(pendingCorrections === 1 ? "dashboard.corrections" : "dashboard.correctionsPlural", {
+                count: pendingCorrections,
+              })}
+            </Link>
           </Button>
         )}
       </CardContent>
@@ -42,10 +53,11 @@ export function PendingActionsCard({
 }
 
 export function AdminQuickLinks({ employeeCount }: { employeeCount: number }) {
+  const { t } = useLocale();
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Quick links</CardTitle>
+        <CardTitle className="text-base">{t("dashboard.quickLinks")}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-2 sm:grid-cols-3">
         <Link
@@ -54,8 +66,8 @@ export function AdminQuickLinks({ employeeCount }: { employeeCount: number }) {
         >
           <Users className="h-4 w-4 text-primary" />
           <div>
-            <p className="font-medium">{employeeCount} teammates</p>
-            <p className="text-xs text-muted-foreground">Manage team</p>
+            <p className="font-medium">{employeeCount}</p>
+            <p className="text-xs text-muted-foreground">{t("nav.team")}</p>
           </div>
         </Link>
         <Link
@@ -64,8 +76,8 @@ export function AdminQuickLinks({ employeeCount }: { employeeCount: number }) {
         >
           <BarChart3 className="h-4 w-4 text-primary" />
           <div>
-            <p className="font-medium">Analytics</p>
-            <p className="text-xs text-muted-foreground">Team trends</p>
+            <p className="font-medium">{t("nav.analytics")}</p>
+            <p className="text-xs text-muted-foreground">{t("analytics.title")}</p>
           </div>
         </Link>
         <Link
@@ -74,8 +86,8 @@ export function AdminQuickLinks({ employeeCount }: { employeeCount: number }) {
         >
           <Settings className="h-4 w-4 text-primary" />
           <div>
-            <p className="font-medium">Settings</p>
-            <p className="text-xs text-muted-foreground">Policies & holidays</p>
+            <p className="font-medium">{t("nav.settings")}</p>
+            <p className="text-xs text-muted-foreground">{t("settings.holidays")}</p>
           </div>
         </Link>
       </CardContent>
@@ -84,19 +96,20 @@ export function AdminQuickLinks({ employeeCount }: { employeeCount: number }) {
 }
 
 export function RoleCapabilitiesCard({ role, capabilities }: { role: Role; capabilities: string[] }) {
+  const { t } = useLocale();
   if (!isBoss(role)) return null;
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">What you can do in this role</CardTitle>
+        <CardTitle className="text-base">{t("dashboard.capabilities")}</CardTitle>
       </CardHeader>
       <CardContent>
         <ul className="space-y-1.5 text-sm text-muted-foreground">
           {capabilities.map((item) => (
             <li key={item} className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-              {item}
+              {t(item as MessageKey)}
             </li>
           ))}
         </ul>

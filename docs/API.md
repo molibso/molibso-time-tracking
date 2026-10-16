@@ -28,7 +28,7 @@ Get a token via login (below). Browser UI sessions (cookies) also work for the s
 
 ### `GET /health`
 
-No auth. Checks Supabase connectivity.
+No auth. Checks PostgreSQL connectivity.
 
 **Response**
 
@@ -37,7 +37,7 @@ No auth. Checks Supabase connectivity.
   "success": true,
   "data": {
     "status": "ok",
-    "database": "supabase-postgresql",
+    "database": "postgresql",
     "userCount": 6,
     "employeeCount": 6
   }

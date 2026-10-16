@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { ClockStatus } from "@/types/clock";
+import { sumWorkedSeconds } from "@/lib/worked-time";
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, secondsBetween } from "@/lib/utils";
 
 export async function getClockStatus(employeeId: string): Promise<{
@@ -30,18 +31,7 @@ export async function getWorkedSeconds(employeeId: string, from: Date, to: Date)
     include: { breaks: true },
   });
 
-  let total = 0;
-  const now = new Date();
-  for (const entry of entries) {
-    const end = entry.clockOut ?? now;
-    let seconds = secondsBetween(entry.clockIn, end);
-    for (const b of entry.breaks) {
-      const breakEnd = b.endedAt ?? now;
-      seconds -= secondsBetween(b.startedAt, breakEnd);
-    }
-    total += Math.max(0, seconds);
-  }
-  return total;
+  return sumWorkedSeconds(entries, { from, to });
 }
 
 export async function getWorkedMinutes(employeeId: string, from: Date, to: Date): Promise<number> {
@@ -65,36 +55,26 @@ export async function getTodayWorkedBreakdown(employeeId: string) {
     orderBy: { clockIn: "asc" },
   });
 
-  let closedSecondsToday = 0;
-  let closedSecondsWeek = 0;
-  let closedSecondsMonth = 0;
   let openClockIn: Date | null = null;
   let openBreakStartedAt: Date | null = null;
   let completedBreakSecondsOnOpen = 0;
 
   for (const entry of entries) {
-    if (!entry.clockOut) {
-      openClockIn = entry.clockIn;
-      for (const b of entry.breaks) {
-        if (b.endedAt) {
-          completedBreakSecondsOnOpen += secondsBetween(b.startedAt, b.endedAt);
-        } else {
-          openBreakStartedAt = b.startedAt;
-        }
-      }
-      continue;
-    }
-
-    let seconds = secondsBetween(entry.clockIn, entry.clockOut);
+    if (entry.clockOut) continue;
+    openClockIn = entry.clockIn;
     for (const b of entry.breaks) {
-      if (b.endedAt) seconds -= secondsBetween(b.startedAt, b.endedAt);
+      if (b.endedAt) {
+        completedBreakSecondsOnOpen += secondsBetween(b.startedAt, b.endedAt);
+      } else {
+        openBreakStartedAt = b.startedAt;
+      }
     }
-    seconds = Math.max(0, seconds);
-
-    if (entry.clockIn >= monthStart) closedSecondsMonth += seconds;
-    if (entry.clockIn >= weekStart) closedSecondsWeek += seconds;
-    if (entry.clockIn >= todayStart) closedSecondsToday += seconds;
   }
+
+  const closed = entries.filter((entry) => entry.clockOut);
+  const closedSecondsMonth = sumWorkedSeconds(closed, { from: monthStart, to: todayEnd }, now);
+  const closedSecondsWeek = sumWorkedSeconds(closed, { from: weekStart, to: todayEnd }, now);
+  const closedSecondsToday = sumWorkedSeconds(closed, { from: todayStart, to: todayEnd }, now);
 
   return {
     closedSecondsToday,
@@ -108,24 +88,41 @@ export async function getTodayWorkedBreakdown(employeeId: string) {
 
 export async function getDashboardHours(employeeId: string) {
   const now = new Date();
-  const [today, week, month] = await Promise.all([
-    getWorkedSeconds(employeeId, startOfDay(now), endOfDay(now)),
-    getWorkedSeconds(employeeId, startOfWeek(now), endOfDay(now)),
-    getWorkedSeconds(employeeId, startOfMonth(now), endOfDay(now)),
-  ]);
-  return { today, week, month };
+  const todayStart = startOfDay(now);
+  const todayEnd = endOfDay(now);
+  const weekStart = startOfWeek(now);
+  const monthStart = startOfMonth(now);
+  const rangeStart = weekStart < monthStart ? weekStart : monthStart;
+
+  const entries = await prisma.clockEntry.findMany({
+    where: { employeeId, clockIn: { gte: rangeStart, lte: todayEnd } },
+    include: { breaks: true },
+  });
+
+  return {
+    today: sumWorkedSeconds(entries, { from: todayStart, to: todayEnd }, now),
+    week: sumWorkedSeconds(entries, { from: weekStart, to: todayEnd }, now),
+    month: sumWorkedSeconds(entries, { from: monthStart, to: todayEnd }, now),
+  };
 }
 
 export async function getWeeklyChartData(employeeId: string) {
-  const days: { day: string; hours: number }[] = [];
   const now = new Date();
-  for (let i = 6; i >= 0; i--) {
+  const days = Array.from({ length: 7 }, (_, index) => {
     const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const seconds = await getWorkedSeconds(employeeId, startOfDay(d), endOfDay(d));
-    days.push({ day: d.toLocaleDateString("en-US", { weekday: "short" }), hours: +(seconds / 3600).toFixed(2) });
-  }
-  return days;
+    d.setDate(d.getDate() - (6 - index));
+    return { start: startOfDay(d), label: d.toLocaleDateString("en-US", { weekday: "short" }) };
+  });
+
+  const entries = await prisma.clockEntry.findMany({
+    where: { employeeId, clockIn: { gte: days[0].start, lte: endOfDay(now) } },
+    include: { breaks: true },
+  });
+
+  return days.map((day) => {
+    const seconds = sumWorkedSeconds(entries, { from: day.start, to: endOfDay(day.start) }, now);
+    return { day: day.label, seconds, hours: +(seconds / 3600).toFixed(2) };
+  });
 }
 
 export async function getVacationBalance(employeeId: string) {

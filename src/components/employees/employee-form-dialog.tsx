@@ -13,6 +13,7 @@ import {
   type EmployeeInput,
 } from "@/lib/validations/employee";
 import { createEmployee, updateEmployee } from "@/actions/employee";
+import { useLocale } from "@/components/layout/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,7 @@ export function EmployeeFormDialog({
   defaultValues?: EmployeeFormValues;
 }) {
   const router = useRouter();
+  const { t } = useLocale();
   const isEditing = !!defaultValues?.id;
 
   const {
@@ -138,7 +140,7 @@ export function EmployeeFormDialog({
                 id="password"
                 type="password"
                 autoComplete="new-password"
-                placeholder="Min. 8 characters"
+                placeholder={t("ph.minPassword")}
                 {...register("password")}
               />
               {errors.password && <p className="text-xs text-danger">{errors.password.message}</p>}

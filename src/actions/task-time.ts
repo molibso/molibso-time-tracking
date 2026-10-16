@@ -17,7 +17,7 @@ async function stopOpenTimer(employeeId: string) {
   const open = await prisma.taskTimeEntry.findFirst({
     where: { employeeId, endedAt: null },
   });
-  if (!open) return;
+  if (!open) return null;
 
   const endedAt = new Date();
   await prisma.taskTimeEntry.update({
@@ -27,6 +27,7 @@ async function stopOpenTimer(employeeId: string) {
       durationSeconds: secondsBetween(open.startedAt, endedAt),
     },
   });
+  return open.id;
 }
 
 async function assertCanTrackTask(taskId: string, employeeId: string) {
@@ -44,7 +45,7 @@ async function assertCanTrackTask(taskId: string, employeeId: string) {
   return task;
 }
 
-export async function startTaskTimer(taskId: string): Promise<ActionResult> {
+export async function startTaskTimer(taskId: string): Promise<ActionResult & { stoppedEntryId?: string }> {
   try {
     const { employeeId } = await requireEmployee();
     const task = await assertCanTrackTask(taskId, employeeId);
@@ -56,7 +57,7 @@ export async function startTaskTimer(taskId: string): Promise<ActionResult> {
       return { success: false, error: "Timer is already running on this task." };
     }
 
-    await stopOpenTimer(employeeId);
+    const stoppedEntryId = await stopOpenTimer(employeeId);
 
     await prisma.$transaction([
       prisma.taskTimeEntry.create({
@@ -73,13 +74,17 @@ export async function startTaskTimer(taskId: string): Promise<ActionResult> {
     ]);
 
     revalidatePath("/tasks");
-    return { success: true, message: `Timer started on "${task.title}".` };
+    return {
+      success: true,
+      message: `Timer started on "${task.title}".`,
+      ...(stoppedEntryId ? { stoppedEntryId } : {}),
+    };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to start timer" };
   }
 }
 
-export async function stopTaskTimer(taskId?: string): Promise<ActionResult> {
+export async function stopTaskTimer(taskId?: string): Promise<ActionResult & { entryId?: string }> {
   try {
     const { employeeId } = await requireEmployee();
 
@@ -102,8 +107,36 @@ export async function stopTaskTimer(taskId?: string): Promise<ActionResult> {
     });
 
     revalidatePath("/tasks");
-    return { success: true, message: `Stopped timer on "${open.task.title}".` };
+    return { success: true, message: `Stopped timer on "${open.task.title}".`, entryId: open.id };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to stop timer" };
+  }
+}
+
+export async function saveTimeEntryNote(entryId: string, note: string): Promise<ActionResult> {
+  try {
+    const { employeeId } = await requireEmployee();
+    const text = note.trim();
+    if (!text) return { success: false, error: "Write a short note, or skip." };
+    if (text.length > 2000) return { success: false, error: "Keep the note under 2000 characters." };
+
+    const entry = await prisma.taskTimeEntry.findUnique({
+      where: { id: entryId },
+      select: { employeeId: true, endedAt: true },
+    });
+    if (!entry || entry.employeeId !== employeeId) {
+      return { success: false, error: "That session could not be found." };
+    }
+    if (!entry.endedAt) return { success: false, error: "Stop the timer before adding a note." };
+
+    await prisma.taskTimeEntry.update({
+      where: { id: entryId },
+      data: { note: text },
+    });
+
+    revalidatePath("/tasks");
+    return { success: true, message: "Note saved." };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "Failed to save note" };
   }
 }

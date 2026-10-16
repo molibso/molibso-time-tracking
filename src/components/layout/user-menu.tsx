@@ -14,8 +14,8 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { initials } from "@/lib/utils";
-import { isBoss } from "@/lib/rbac";
-import { getRoleView } from "@/lib/role-views";
+import { effectiveRole, isBoss } from "@/lib/rbac";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export function UserMenu({
   name,
@@ -30,7 +30,8 @@ export function UserMenu({
 }) {
   const [first, ...rest] = name.split(" ");
   const last = rest.join(" ") || first;
-  const roleView = getRoleView(role as Role);
+  const { t } = useLocale();
+  const roleLabel = t(effectiveRole(role as Role) === "ADMIN" ? "role.boss" : "role.employee");
 
   return (
     <DropdownMenu>
@@ -42,7 +43,7 @@ export function UserMenu({
           </Avatar>
           <div className="hidden text-left sm:block">
             <p className="text-sm font-medium leading-tight">{name}</p>
-            <p className="text-xs text-muted-foreground leading-tight">{roleView.label}</p>
+            <p className="text-xs text-muted-foreground leading-tight">{roleLabel}</p>
           </div>
         </button>
       </DropdownMenuTrigger>
@@ -54,19 +55,19 @@ export function UserMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/profile">
-            <UserIcon className="h-4 w-4" /> My profile
+            <UserIcon className="h-4 w-4" /> {t("common.myProfile")}
           </Link>
         </DropdownMenuItem>
         {isBoss(role as Role) && (
           <DropdownMenuItem asChild>
             <Link href="/settings">
-              <Settings className="h-4 w-4" /> Settings
+              <Settings className="h-4 w-4" /> {t("common.settings")}
             </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })} className="text-danger">
-          <LogOut className="h-4 w-4" /> Sign out
+          <LogOut className="h-4 w-4" /> {t("common.signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

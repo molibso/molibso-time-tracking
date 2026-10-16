@@ -10,23 +10,24 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { effectiveRole } from "@/lib/rbac";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 export interface NavItem {
-  label: string;
+  labelKey: MessageKey;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: Role[];
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Time Tracking", href: "/time-tracking", icon: Clock },
-  { label: "Attendance", href: "/attendance", icon: CalendarDays },
-  { label: "Leave", href: "/leave", icon: PlaneTakeoff },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare },
-  { label: "Team", href: "/employees", icon: Users, roles: ["ADMIN"] },
-  { label: "Analytics", href: "/analytics", icon: BarChart3, roles: ["ADMIN"] },
-  { label: "Settings", href: "/settings", icon: Settings, roles: ["ADMIN"] },
+  { labelKey: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { labelKey: "nav.timeTracking", href: "/time-tracking", icon: Clock },
+  { labelKey: "nav.attendance", href: "/attendance", icon: CalendarDays },
+  { labelKey: "nav.leave", href: "/leave", icon: PlaneTakeoff },
+  { labelKey: "nav.tasks", href: "/tasks", icon: CheckSquare },
+  { labelKey: "nav.team", href: "/employees", icon: Users, roles: ["ADMIN"] },
+  { labelKey: "nav.analytics", href: "/analytics", icon: BarChart3, roles: ["ADMIN"] },
+  { labelKey: "nav.settings", href: "/settings", icon: Settings, roles: ["ADMIN"] },
 ];
 
 export function visibleNavItems(role: Role): NavItem[] {

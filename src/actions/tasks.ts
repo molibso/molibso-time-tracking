@@ -1,20 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { TaskPriority } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
 import { notifyUserNewTask } from "@/lib/notifications";
-import { projectSchema, taskSchema, taskStatusSchema } from "@/lib/validations/tasks";
+import { projectSchema, updateProjectSchema, taskSchema, taskStatusSchema } from "@/lib/validations/tasks";
 import type { ActionResult } from "./auth";
-
-async function requireBoss() {
-  const session = await auth();
-  if (!session?.user.employeeId || !hasPermission(session.user.role, "EMPLOYEE_MANAGE")) {
-    throw new Error("You don't have permission to manage tasks.");
-  }
-  return session;
-}
 
 async function requireEmployee() {
   const session = await auth();
@@ -24,7 +16,7 @@ async function requireEmployee() {
 
 export async function createProject(input: unknown): Promise<ActionResult & { projectId?: string }> {
   try {
-    await requireBoss();
+    await requireEmployee();
     const parsed = projectSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -45,9 +37,50 @@ export async function createProject(input: unknown): Promise<ActionResult & { pr
   }
 }
 
+export async function updateProject(input: unknown): Promise<ActionResult> {
+  try {
+    await requireEmployee();
+    const parsed = updateProjectSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    }
+
+    const existing = await prisma.project.findUnique({ where: { id: parsed.data.id } });
+    if (!existing) return { success: false, error: "Project not found." };
+
+    await prisma.project.update({
+      where: { id: parsed.data.id },
+      data: {
+        name: parsed.data.name,
+        description: parsed.data.description,
+      },
+    });
+
+    revalidatePath("/tasks");
+    return { success: true, message: "Project updated." };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "Failed to update project" };
+  }
+}
+
+export async function deleteProject(id: string): Promise<ActionResult> {
+  try {
+    await requireEmployee();
+    await prisma.$transaction([
+      prisma.task.updateMany({ where: { projectId: id }, data: { projectId: null } }),
+      prisma.projectMember.deleteMany({ where: { projectId: id } }),
+      prisma.project.delete({ where: { id } }),
+    ]);
+    revalidatePath("/tasks");
+    return { success: true, message: "Project deleted." };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "Failed to delete project." };
+  }
+}
+
 export async function createTask(input: unknown): Promise<ActionResult & { taskId?: string }> {
   try {
-    const session = await requireBoss();
+    const session = await requireEmployee();
     const parsed = taskSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -98,7 +131,7 @@ export async function createTask(input: unknown): Promise<ActionResult & { taskI
 
 export async function updateTaskStatus(input: unknown): Promise<ActionResult> {
   try {
-    const session = await requireEmployee();
+    await requireEmployee();
     const parsed = taskStatusSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -106,11 +139,6 @@ export async function updateTaskStatus(input: unknown): Promise<ActionResult> {
 
     const task = await prisma.task.findUnique({ where: { id: parsed.data.id } });
     if (!task) return { success: false, error: "Task not found." };
-
-    const isBoss = hasPermission(session.user.role, "EMPLOYEE_MANAGE");
-    if (!isBoss && task.assigneeId !== session.user.employeeId) {
-      return { success: false, error: "You can only update your own tasks." };
-    }
 
     await prisma.task.update({
       where: { id: parsed.data.id },
@@ -124,9 +152,48 @@ export async function updateTaskStatus(input: unknown): Promise<ActionResult> {
   }
 }
 
+export async function createSubtask(input: {
+  parentId: string;
+  title: string;
+  description?: string | null;
+  priority?: TaskPriority;
+  dueDate?: Date | null;
+  estimatedHours?: number | null;
+}): Promise<ActionResult> {
+  try {
+    const session = await requireEmployee();
+    const title = input.title.trim();
+    if (!title) return { success: false, error: "Enter a subtask title." };
+
+    const parent = await prisma.task.findUnique({ where: { id: input.parentId } });
+    if (!parent || parent.parentId) return { success: false, error: "Choose a main task." };
+
+    const hours = input.estimatedHours;
+    await prisma.task.create({
+      data: {
+        title: title.slice(0, 200),
+        description: input.description?.trim() || null,
+        parentId: parent.id,
+        projectId: parent.projectId,
+        assigneeId: parent.assigneeId,
+        createdById: session.user.employeeId!,
+        priority: input.priority ?? parent.priority,
+        status: "TODO",
+        dueDate: input.dueDate ?? null,
+        estimatedHours: hours == null || Number.isNaN(hours) ? null : hours,
+      },
+    });
+
+    revalidatePath("/tasks");
+    return { success: true, message: "Subtask added." };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "Failed to add subtask" };
+  }
+}
+
 export async function deleteTask(id: string): Promise<ActionResult> {
   try {
-    await requireBoss();
+    await requireEmployee();
     await prisma.task.delete({ where: { id } });
     revalidatePath("/tasks");
     return { success: true, message: "Task deleted." };

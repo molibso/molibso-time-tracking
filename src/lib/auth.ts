@@ -1,16 +1,12 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
+import authConfig from "@/lib/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  trustHost: true,
-  session: { strategy: "jwt", maxAge: 8 * 60 * 60 },
-  pages: {
-    signIn: "/login",
-  },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -49,7 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return {
           id: user.id,
           email: user.email,
-          role: user.role as Role,
+          role: user.role,
           name: user.employee ? `${user.employee.firstName} ${user.employee.lastName}` : user.email,
           employeeId: user.employee?.id ?? null,
           image: user.image ?? undefined,
@@ -57,22 +53,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.role = user.role;
-        token.employeeId = user.employeeId;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub ?? "";
-        session.user.role = (token.role as Role) ?? Role.EMPLOYEE;
-        session.user.employeeId = (token.employeeId as string | null) ?? null;
-      }
-      return session;
-    },
-  },
-  secret: process.env.AUTH_SECRET,
 });

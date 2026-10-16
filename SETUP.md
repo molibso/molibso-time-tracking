@@ -44,20 +44,22 @@ npm -v
 winget install PostgreSQL.PostgreSQL
 ```
 
-### Create the database
+### Create the database and app user
 
-Open **SQL Shell (psql)** from the Start menu, or pgAdmin, and run:
+Open **SQL Shell (psql)** from the Start menu (log in as `postgres` with the password
+you chose during install), or pgAdmin, and run:
 
 ```sql
-CREATE DATABASE molibso;
+-- Matches docker-compose.yml / .env.example defaults
+CREATE ROLE molibso LOGIN PASSWORD 'molibso' CREATEDB;  -- skip if role exists; or ALTER ROLE … PASSWORD 'molibso'
+CREATE DATABASE molibso OWNER molibso;                  -- skip if database exists
 ```
 
-Or from PowerShell (adjust path if needed):
+Or from PowerShell (prompts for the `postgres` password; adjust the version folder if needed):
 
 ```powershell
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE molibso;"
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -f scripts\setup-local-db.sql
 ```
-
 ---
 
 ## 3. Project setup
@@ -68,19 +70,22 @@ cd workforce-app
 
 npm install
 
-# Copy env and edit DATABASE_URL with your postgres password
+# Copy env — defaults already point at local molibso/molibso
 copy .env.example .env
 ```
 
-Edit `.env`:
+`.env` should look like:
 
 ```env
-DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/molibso?schema=public"
+DATABASE_URL="postgresql://molibso:molibso@localhost:5432/molibso?schema=public"
+DIRECT_URL="postgresql://molibso:molibso@localhost:5432/molibso?schema=public"
 USE_MOCK_DATA=false
 AUTH_SECRET="any-long-random-string-for-dev"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
+> Prefer Docker when available: see [docs/POSTGRES.md](./docs/POSTGRES.md) (`npm run db:up`).
+> Same credentials either way — no PgBouncer / Supabase required.
 Generate a secret (optional):
 
 ```powershell

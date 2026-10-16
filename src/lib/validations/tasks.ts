@@ -8,6 +8,12 @@ export const projectSchema = z.object({
 
 export type ProjectInput = z.infer<typeof projectSchema>;
 
+export const updateProjectSchema = projectSchema.extend({
+  id: z.string().min(1),
+});
+
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
 export const taskSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
   description: z.string().max(4000).optional(),

@@ -5,9 +5,11 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ProfileForm } from "@/components/profile/profile-form";
-import { initials, formatDate } from "@/lib/utils";
+import { initials, formatDate, formatTime } from "@/lib/utils";
+import { getLocale } from "@/lib/i18n/get-locale";
 
 export default async function ProfilePage() {
+  const locale = await getLocale();
   const session = await auth();
   if (!session) redirect("/login");
   const employeeId = session.user.employeeId;
@@ -59,7 +61,7 @@ export default async function ProfilePage() {
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Hire date</dt>
-                <dd>{formatDate(employee.hireDate)}</dd>
+                <dd className="tabular-nums">{formatDate(employee.hireDate, locale)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Weekly hours</dt>
@@ -95,7 +97,7 @@ export default async function ProfilePage() {
                     <p className="text-xs text-muted-foreground">{s.location ?? "—"}</p>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {formatDate(s.startTime)} {s.startTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    {formatDate(s.startTime, locale)} {formatTime(s.startTime, false, locale)}
                   </p>
                 </div>
               ))}

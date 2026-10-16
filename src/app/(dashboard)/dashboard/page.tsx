@@ -3,6 +3,8 @@ import { Role } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission, isBoss } from "@/lib/rbac";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { translate } from "@/lib/i18n/messages";
 import { getRoleView } from "@/lib/role-views";
 import { getVisibleEmployeeIds, leaveEmployeeIdsWhere } from "@/lib/role-scope";
 import {
@@ -14,6 +16,7 @@ import {
   getUpcomingLeave,
 } from "@/lib/queries/dashboard";
 import { ClockWidget } from "@/components/time-tracking/clock-widget";
+import { ClockSessionProvider } from "@/components/time-tracking/clock-session";
 import { WorkedHoursKpis } from "@/components/dashboard/worked-hours-kpis";
 import { WeeklyHoursChart } from "@/components/charts/weekly-hours-chart";
 import { TeamAvailability } from "@/components/dashboard/team-availability";
@@ -38,16 +41,17 @@ export default async function DashboardPage({
   const { error } = await searchParams;
   const role = session.user.role ?? Role.EMPLOYEE;
   const roleView = getRoleView(role);
+  const locale = await getLocale();
+  const boss = isBoss(role);
   const canViewTeam = hasPermission(role, "EMPLOYEE_VIEW_ALL");
   const canApprove = hasPermission(role, "LEAVE_APPROVE");
-  const boss = isBoss(role);
   const employeeId = session.user.employeeId;
 
   if (!employeeId) {
     return (
       <div className="rounded-xl border border-border bg-surface p-8 text-center">
         <p className="text-muted-foreground">
-          Your account isn&apos;t linked to an employee profile yet. Contact a boss.
+          {translate(locale, "dashboard.unlinked")}
         </p>
       </div>
     );
@@ -104,37 +108,45 @@ export default async function DashboardPage({
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Welcome back, {employee?.firstName ?? "there"}
+              {translate(locale, "dashboard.welcome", {
+                name: employee?.firstName ?? translate(locale, "dashboard.there"),
+              })}
             </h1>
             <RoleBadge role={role} />
           </div>
-          <p className="mt-1.5 text-sm font-semibold text-petrol">{roleView.dashboardTitle}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">{roleView.dashboardSubtitle}</p>
+          <p className="mt-1.5 text-sm font-semibold text-petrol">
+            {translate(locale, boss ? "dashboard.teamTitle" : "dashboard.workspaceTitle")}
+          </p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {translate(locale, boss ? "dashboard.teamHint" : "dashboard.workspaceHint")}
+          </p>
         </div>
       </div>
 
       {canApprove && <PendingActionsCard pendingLeave={pendingLeave} pendingCorrections={pendingCorrections} />}
 
-      <ClockWidget
-        initialStatus={clockStatus.status}
-        clockInTime={clockStatus.openEntry?.clockIn.toISOString() ?? null}
-        breakSince={clockStatus.onBreakSince?.toISOString() ?? null}
-      />
+      <ClockSessionProvider
+        initial={{
+          status: clockStatus.status,
+          clockInTime: clockStatus.openEntry?.clockIn.toISOString() ?? null,
+          breakSince: clockStatus.onBreakSince?.toISOString() ?? null,
+          completedBreakSecondsOnOpen: worked.completedBreakSecondsOnOpen,
+        }}
+      >
+        <ClockWidget />
 
-      <WorkedHoursKpis
-        closedSecondsToday={worked.closedSecondsToday}
-        closedSecondsWeek={worked.closedSecondsWeek}
-        closedSecondsMonth={worked.closedSecondsMonth}
-        openClockIn={worked.openClockIn}
-        openBreakStartedAt={worked.openBreakStartedAt}
-        completedBreakSecondsOnOpen={worked.completedBreakSecondsOnOpen}
-        vacation={vacation}
-      />
+        <WorkedHoursKpis
+          closedSecondsToday={worked.closedSecondsToday}
+          closedSecondsWeek={worked.closedSecondsWeek}
+          closedSecondsMonth={worked.closedSecondsMonth}
+          vacation={vacation}
+        />
+      </ClockSessionProvider>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Hours worked — last 7 days</CardTitle>
+            <CardTitle>{translate(locale, "dashboard.hoursChart")}</CardTitle>
           </CardHeader>
           <CardContent>
             <WeeklyHoursChart data={chartData} />
@@ -143,7 +155,9 @@ export default async function DashboardPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>{canViewTeam ? "Upcoming team leave" : "Your upcoming leave"}</CardTitle>
+            <CardTitle>
+              {translate(locale, canViewTeam ? "dashboard.upcomingTeamLeave" : "dashboard.upcomingLeave")}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <UpcomingLeave items={upcomingLeave} showName={canViewTeam} />
@@ -154,7 +168,7 @@ export default async function DashboardPage({
       {canViewTeam && (
         <Card>
           <CardHeader>
-            <CardTitle>Team availability</CardTitle>
+            <CardTitle>{translate(locale, "dashboard.teamAvailability")}</CardTitle>
           </CardHeader>
           <CardContent>
             <TeamAvailability members={teamAvailability} />

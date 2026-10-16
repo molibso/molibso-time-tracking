@@ -362,6 +362,7 @@ model Holiday {
   id      String   @id @default(cuid())
   name    String
   date    DateTime
+  endDate DateTime?
   isPaid  Boolean  @default(true)
 
   createdAt DateTime @default(now())
@@ -417,13 +418,19 @@ model Task {
   createdById  String
   createdBy    Employee     @relation("TaskCreator", fields: [createdById], references: [id])
 
+  parentId     String?
+  parent       Task?        @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks     Task[]       @relation("TaskSubtasks")
+
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
   timeEntries  TaskTimeEntry[]
+  sourceEntry  TaskTimeEntry? @relation("PromotedNote")
 
   @@index([assigneeId])
   @@index([status])
+  @@index([parentId])
 }
 
 model TaskTimeEntry {
@@ -435,6 +442,9 @@ model TaskTimeEntry {
   startedAt       DateTime  @default(now())
   endedAt         DateTime?
   durationSeconds Int?
+  note            String?
+  subtaskId       String?   @unique
+  subtask         Task?     @relation("PromotedNote", fields: [subtaskId], references: [id], onDelete: SetNull)
 
   createdAt       DateTime  @default(now())
 
@@ -483,6 +493,7 @@ model CompanySettings {
   notifyClockOutReminder Boolean @default(true)
   notifyBreakReminder   Boolean  @default(true)
   notifyLeaveUpdates    Boolean  @default(true)
+  notifyOvertimeAlert   Boolean  @default(true)
 
   updatedAt             DateTime @updatedAt
 }

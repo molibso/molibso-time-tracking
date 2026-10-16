@@ -84,7 +84,17 @@ export async function createHoliday(input: unknown): Promise<ActionResult> {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
     }
 
-    await prisma.holiday.create({ data: parsed.data });
+    const start = parsed.data.date;
+    const end = parsed.data.endDate && parsed.data.endDate > start ? parsed.data.endDate : null;
+
+    await prisma.holiday.create({
+      data: {
+        name: parsed.data.name,
+        date: start,
+        endDate: end,
+        isPaid: parsed.data.isPaid,
+      },
+    });
     revalidatePath("/settings");
     revalidatePath("/attendance");
     return { success: true, message: "Holiday added." };

@@ -10,8 +10,10 @@ import { requestPasswordReset } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export function ForgotPasswordForm() {
+  const { t } = useLocale();
   const [sent, setSent] = useState<string | null>(null);
   const {
     register,
@@ -50,7 +52,7 @@ export function ForgotPasswordForm() {
 
       <div className="space-y-1.5">
         <Label htmlFor="email">Work email</Label>
-        <Input id="email" type="email" placeholder="you@company.com" {...register("email")} />
+        <Input id="email" type="email" placeholder={t("ph.emailGeneric")} {...register("email")} />
         {errors.email && <p className="text-xs text-danger">{errors.email.message}</p>}
       </div>
 

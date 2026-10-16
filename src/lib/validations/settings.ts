@@ -9,12 +9,12 @@ export const companySettingsSchema = z.object({
   breakDurationMinutes: z.coerce.number().min(0).max(240),
   maxBreaksPerDay: z.coerce.number().min(0).max(10),
   overtimeThresholdDaily: z.coerce.number().min(0).max(24),
-  overtimeMultiplier: z.coerce.number().min(1).max(3),
   defaultVacationDays: z.coerce.number().min(0).max(60),
   notifyClockInReminder: z.boolean(),
   notifyClockOutReminder: z.boolean(),
   notifyBreakReminder: z.boolean(),
   notifyLeaveUpdates: z.boolean(),
+  notifyOvertimeAlert: z.boolean(),
 });
 export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
 
@@ -25,9 +25,15 @@ export const departmentSchema = z.object({
 });
 export type DepartmentInput = z.infer<typeof departmentSchema>;
 
-export const holidaySchema = z.object({
-  name: z.string().min(1).max(100),
-  date: z.coerce.date(),
-  isPaid: z.boolean().default(true),
-});
+export const holidaySchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    date: z.coerce.date(),
+    endDate: z.coerce.date().optional().nullable(),
+    isPaid: z.boolean().default(true),
+  })
+  .refine((data) => !data.endDate || data.endDate >= data.date, {
+    message: "End date must be on or after the start date.",
+    path: ["endDate"],
+  });
 export type HolidayInput = z.infer<typeof holidaySchema>;

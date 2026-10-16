@@ -1,22 +1,34 @@
 /**
- * Prisma client — PostgreSQL (Supabase) by default.
+ * Prisma client — local PostgreSQL by default.
  * Set USE_MOCK_DATA=true only for offline demos without a database.
  *
  * Important: always reuse one client in dev (Next.js HMR). Creating a new
- * PrismaClient per reload exhausts Supabase pooler connections (EMAXCONN).
+ * PrismaClient per reload can exhaust database connection slots.
  */
 import { PrismaClient } from "@prisma/client";
 
 const useMockData = process.env.USE_MOCK_DATA === "true";
 
+const POOL_REVISION = 2;
+
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
+  prismaPoolRevision?: number;
   mockSeeded?: boolean;
   mockClientPromise?: Promise<PrismaClient>;
 };
 
+/** Prefer a small pool so one page can run several queries without serializing hard. */
+function pooledDatabaseUrl(): string | undefined {
+  const url = process.env.DATABASE_URL;
+  if (!url) return url;
+  return url.replace(/([?&]connection_limit=)1\b/, (_, prefix: string) => `${prefix}10`);
+}
+
 function createPostgresClient(): PrismaClient {
+  const url = pooledDatabaseUrl();
   return new PrismaClient({
+    datasources: url ? { db: { url } } : undefined,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 }
@@ -81,8 +93,10 @@ function withLazyClient(getClient: () => Promise<PrismaClient>): PrismaClient {
 }
 
 function getPostgresClient(): PrismaClient {
-  if (!globalForPrisma.prisma) {
+  if (!globalForPrisma.prisma || globalForPrisma.prismaPoolRevision !== POOL_REVISION) {
+    void globalForPrisma.prisma?.$disconnect();
     globalForPrisma.prisma = createPostgresClient();
+    globalForPrisma.prismaPoolRevision = POOL_REVISION;
   }
   return globalForPrisma.prisma;
 }

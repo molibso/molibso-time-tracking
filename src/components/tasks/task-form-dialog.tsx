@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLocale } from "@/components/layout/locale-provider";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Plus } from "lucide-react";
@@ -22,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { TASK_PRIORITIES, taskPriorityKey } from "@/lib/i18n/labels";
 
 export interface TaskFormOption {
   id: string;
@@ -36,6 +38,7 @@ export function TaskFormDialog({
   projects: TaskFormOption[];
 }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -76,38 +79,36 @@ export function TaskFormDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="h-4 w-4" /> Assign task
+          <Plus className="h-4 w-4" /> {t("tasks.assign")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Assign task</DialogTitle>
-          <DialogDescription>
-            Create a task for a teammate with delivery date and estimated hours.
-          </DialogDescription>
+          <DialogTitle>{t("tasks.assignTitle")}</DialogTitle>
+          <DialogDescription>{t("tasks.assignDescription")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">{t("tasks.field.title")}</Label>
             <Input id="title" {...register("title")} />
             {errors.title && <p className="text-xs text-danger">{errors.title.message}</p>}
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t("tasks.field.description")}</Label>
             <Textarea id="description" rows={3} {...register("description")} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Assign to</Label>
+              <Label>{t("tasks.field.assignTo")}</Label>
               <Controller
                 control={control}
                 name="assigneeId"
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select teammate" />
+                      <SelectValue placeholder={t("common.selectTeammate")} />
                     </SelectTrigger>
                     <SelectContent>
                       {employees.map((e) => (
@@ -122,17 +123,17 @@ export function TaskFormDialog({
               {errors.assigneeId && <p className="text-xs text-danger">{errors.assigneeId.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Project</Label>
+              <Label>{t("tasks.field.project")}</Label>
               <Controller
                 control={control}
                 name="projectId"
                 render={({ field }) => (
                   <Select value={field.value ?? ""} onValueChange={(v) => field.onChange(v || null)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Optional" />
+                      <SelectValue placeholder={t("ph.optional")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No project</SelectItem>
+                      <SelectItem value="">{t("tasks.field.noProject")}</SelectItem>
                       {projects.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.label}
@@ -145,9 +146,9 @@ export function TaskFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Priority</Label>
+              <Label>{t("tasks.field.priority")}</Label>
               <Controller
                 control={control}
                 name="priority"
@@ -157,17 +158,21 @@ export function TaskFormDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="LOW">Low</SelectItem>
-                      <SelectItem value="MEDIUM">Medium</SelectItem>
-                      <SelectItem value="HIGH">High</SelectItem>
-                      <SelectItem value="URGENT">Urgent</SelectItem>
+                      {TASK_PRIORITIES.map((priority) => {
+                        const key = taskPriorityKey(priority);
+                        return (
+                          <SelectItem key={priority} value={priority}>
+                            {key ? t(key) : priority}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 )}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dueDate">Due date</Label>
+              <Label htmlFor="dueDate">{t("tasks.field.due")}</Label>
               <Input
                 id="dueDate"
                 type="date"
@@ -176,19 +181,19 @@ export function TaskFormDialog({
                 })}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="estimatedHours">Est. hours</Label>
-              <Input id="estimatedHours" type="number" step="0.5" {...register("estimatedHours")} />
+            <div className="space-y-1.5 sm:col-span-2 sm:max-w-[calc(50%-0.5rem)]">
+              <Label htmlFor="estimatedHours">{t("tasks.field.estimate")}</Label>
+              <Input id="estimatedHours" type="number" step="0.5" min={0.25} {...register("estimatedHours")} />
             </div>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting || isPending}>
               {(isSubmitting || isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
-              Assign
+              {t("tasks.assignAction")}
             </Button>
           </DialogFooter>
         </form>

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Montserrat, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { LocaleProvider } from "@/components/layout/locale-provider";
+import { getLocale } from "@/lib/i18n/get-locale";
 import { Toaster } from "sonner";
 
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-montserrat" });
@@ -12,13 +14,17 @@ export const metadata: Metadata = {
   description: "Internal team tool for molibso GmbH — time, leave, and attendance",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body className={`${montserrat.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          {children}
-          <Toaster position="top-right" richColors closeButton />
+          <LocaleProvider locale={locale}>
+            {children}
+            <Toaster position="top-right" richColors closeButton />
+          </LocaleProvider>
         </ThemeProvider>
       </body>
     </html>

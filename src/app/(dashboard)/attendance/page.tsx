@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
-import { getRoleView } from "@/lib/role-views";
+import { effectiveRole, hasPermission } from "@/lib/rbac";
 import { getVisibleEmployeeIds, leaveEmployeeIdsWhere } from "@/lib/role-scope";
 import { resolveTeamView } from "@/lib/team-view";
 import { AttendanceCalendar, type AttendanceDay } from "@/components/attendance/attendance-calendar";
@@ -12,6 +11,15 @@ import { RoleBadge } from "@/components/layout/role-badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { formatDate, formatDuration } from "@/lib/utils";
+import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { translate } from "@/lib/i18n/messages";
+
+function calendarDateKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
 
 export default async function AttendancePage({
   searchParams,
@@ -25,7 +33,8 @@ export default async function AttendancePage({
 
   const { employeeId: requestedId } = await searchParams;
   const role = session.user.role;
-  const roleView = getRoleView(role);
+  const locale = await getLocale();
+  const boss = effectiveRole(role) === "ADMIN";
   const canApprove = hasPermission(role, "ATTENDANCE_EDIT");
 
   const view = await resolveTeamView({
@@ -42,6 +51,7 @@ export default async function AttendancePage({
   const [attendances, pendingCorrections] = await Promise.all([
     prisma.attendance.findMany({
       where: { employeeId, date: { gte: yearStart, lte: yearEnd } },
+      include: { clockEntries: { include: { breaks: true } } },
       orderBy: { date: "desc" },
     }),
     canApprove
@@ -54,8 +64,9 @@ export default async function AttendancePage({
   ]);
 
   const days: AttendanceDay[] = attendances.map((a) => ({
-    date: a.date.toISOString().slice(0, 10),
+    date: calendarDateKey(a.date),
     status: a.status as AttendanceDay["status"],
+    workedSeconds: a.clockEntries.length > 0 ? sumWorkedSeconds(a.clockEntries) : Math.max(0, a.totalWorkedMinutes) * 60,
   }));
 
   const corrections: PendingCorrection[] = pendingCorrections.map((c) => ({
@@ -76,11 +87,13 @@ export default async function AttendancePage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{translate(locale, "attendance.title")}</h1>
             <RoleBadge role={role} />
           </div>
           <p className="text-sm text-muted-foreground">
-            {view.isSelf ? roleView.pageCopy.attendance : `Attendance for ${view.viewedName}.`}
+            {view.isSelf
+              ? translate(locale, boss ? "attendance.subtitleBoss" : "attendance.subtitle")
+              : translate(locale, "attendance.forName", { name: view.viewedName })}
           </p>
         </div>
         {view.canViewTeam && <TeamMemberSelect members={view.members} value={employeeId} />}
@@ -88,7 +101,11 @@ export default async function AttendancePage({
 
       <Card>
         <CardHeader>
-          <CardTitle>{view.isSelf ? "Your calendar" : `${view.viewedName}'s calendar`}</CardTitle>
+          <CardTitle>
+            {view.isSelf
+              ? translate(locale, "attendance.yourCalendar")
+              : translate(locale, "attendance.theirCalendar", { name: view.viewedName })}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <AttendanceCalendar days={days} />
@@ -97,34 +114,38 @@ export default async function AttendancePage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Daily hours</CardTitle>
+          <CardTitle>{translate(locale, "attendance.dailyHours")}</CardTitle>
         </CardHeader>
         <CardContent>
           {recentWithHours.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No worked days recorded yet.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">{translate(locale, "attendance.none")}</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Worked</TableHead>
-                  <TableHead>Break</TableHead>
-                  <TableHead>Overtime</TableHead>
+                  <TableHead>{translate(locale, "attendance.date")}</TableHead>
+                  <TableHead>{translate(locale, "attendance.status")}</TableHead>
+                  <TableHead>{translate(locale, "attendance.worked")}</TableHead>
+                  <TableHead>{translate(locale, "attendance.break")}</TableHead>
+                  <TableHead>{translate(locale, "attendance.overtime")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentWithHours.map((a) => (
+                {recentWithHours.map((a) => {
+                  const workedSeconds = a.clockEntries.length > 0 ? sumWorkedSeconds(a.clockEntries) : Math.max(0, a.totalWorkedMinutes) * 60;
+                  const breakSeconds = a.clockEntries.length > 0 ? sumBreakSeconds(a.clockEntries) : Math.max(0, a.breakMinutes) * 60;
+                  return (
                   <TableRow key={a.id}>
-                    <TableCell className="font-medium">{formatDate(a.date)}</TableCell>
+                    <TableCell className="font-medium tabular-nums">{formatDate(a.date, locale)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{a.status}</TableCell>
-                    <TableCell className="font-medium">{formatDuration(a.totalWorkedMinutes * 60)}</TableCell>
-                    <TableCell>{formatDuration(a.breakMinutes * 60)}</TableCell>
+                    <TableCell className="font-medium">{formatDuration(workedSeconds)}</TableCell>
+                    <TableCell>{formatDuration(breakSeconds)}</TableCell>
                     <TableCell>
                       {a.overtimeMinutes > 0 ? formatDuration(a.overtimeMinutes * 60) : "—"}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -134,7 +155,7 @@ export default async function AttendancePage({
       {canApprove && (
         <Card>
           <CardHeader>
-            <CardTitle>Pending correction requests</CardTitle>
+            <CardTitle>{translate(locale, "attendance.correctionsTitle")}</CardTitle>
           </CardHeader>
           <CardContent>
             <CorrectionApprovals items={corrections} />

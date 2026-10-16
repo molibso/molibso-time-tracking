@@ -6,18 +6,20 @@ Internal team tool for **molibso GmbH** — time tracking, leave, attendance, an
 
 - **Frontend + Backend:** Next.js 15 (App Router, Server Actions, REST `/api/v1`)
 - **ORM:** Prisma
-- **Database:** Supabase PostgreSQL
+- **Database:** PostgreSQL (local / Docker / office VM)
 - **Auth:** Auth.js (UI sessions) + Bearer JWT (REST APIs)
 
-## Quick start with Supabase
+## Quick start (local Postgres)
 
-Full guide: **[docs/SUPABASE.md](./docs/SUPABASE.md)**  
-API reference: **[docs/API.md](./docs/API.md)**
+Full guide: **[docs/POSTGRES.md](./docs/POSTGRES.md)**  
+API reference: **[docs/API.md](./docs/API.md)**  
+Windows native install: **[SETUP.md](./SETUP.md)**
 
 ```bash
 npm install
-# edit .env with your Supabase DATABASE_URL + DIRECT_URL
-npm run db:setup
+copy .env.example .env
+npm run db:up          # Docker Postgres on localhost:5432
+npm run db:setup       # migrations + seed
 npm run dev
 ```
 

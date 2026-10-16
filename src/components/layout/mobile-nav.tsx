@@ -2,21 +2,23 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import type { Role } from "@prisma/client";
 import { visibleNavItems } from "./nav-config";
+import { isNavActive, useCurrentPath } from "./navigation-pending";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export function MobileNav({ role }: { role: Role }) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
+  const pathname = useCurrentPath();
+  const { t } = useLocale();
   const items = visibleNavItems(role);
 
   return (
     <div className="lg:hidden">
-      <Button variant="ghost" size="icon" onClick={() => setOpen(true)} aria-label="Open menu">
+      <Button variant="ghost" size="icon" onClick={() => setOpen(true)} aria-label={t("common.openMenu")}>
         <Menu className="h-5 w-5" />
       </Button>
 
@@ -27,7 +29,7 @@ export function MobileNav({ role }: { role: Role }) {
             <div className="flex h-[72px] items-center justify-between px-5">
               <div>
                 <p className="text-lg font-bold lowercase tracking-tight text-petrol">molibso</p>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Internal</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">{t("common.internal")}</p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
                 <X className="h-4 w-4" />
@@ -35,11 +37,12 @@ export function MobileNav({ role }: { role: Role }) {
             </div>
             <nav className="flex-1 space-y-0.5 px-3">
               {items.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                const active = isNavActive(item.href, pathname);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={true}
                     onClick={() => setOpen(false)}
                     className={cn(
                       "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
@@ -49,7 +52,7 @@ export function MobileNav({ role }: { role: Role }) {
                     )}
                   >
                     <item.icon className={cn("h-[18px] w-[18px]", active && "text-primary")} />
-                    {item.label}
+                    {t(item.labelKey)}
                   </Link>
                 );
               })}

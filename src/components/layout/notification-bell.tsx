@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { markNotificationRead, markAllNotificationsRead } from "@/actions/notifications";
+import { useLocale } from "@/components/layout/locale-provider";
+import { localizeNotification } from "@/lib/i18n/notification-text";
 import { cn } from "@/lib/utils";
 
 export interface NotificationItem {
@@ -26,6 +28,7 @@ export interface NotificationItem {
 }
 
 export function NotificationBell({ notifications }: { notifications: NotificationItem[] }) {
+  const { locale, t } = useLocale();
   const [items, setItems] = useState(notifications);
   const unreadCount = items.filter((n) => !n.isRead).length;
 
@@ -42,7 +45,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative" aria-label={t("notifications.aria")}>
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
             <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-danger" />
@@ -51,19 +54,21 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
         <div className="flex items-center justify-between px-2 py-1">
-          <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+          <DropdownMenuLabel className="p-0">{t("notifications.title")}</DropdownMenuLabel>
           {unreadCount > 0 && (
             <button onClick={handleMarkAll} className="text-xs text-primary hover:underline">
-              Mark all read
+              {t("notifications.markAll")}
             </button>
           )}
         </div>
         <DropdownMenuSeparator />
         {items.length === 0 && (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">You're all caught up.</div>
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">{t("notifications.empty")}</div>
         )}
         <div className="max-h-80 overflow-y-auto">
-          {items.map((n) => (
+          {items.map((n) => {
+            const text = localizeNotification(locale, n);
+            return (
             <DropdownMenuItem key={n.id} asChild onClick={() => handleOpenItem(n.id)}>
               <Link
                 href={n.link ?? "#"}
@@ -71,12 +76,13 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
               >
                 <span className="flex items-center gap-2 text-sm font-medium">
                   {!n.isRead && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                  {n.title}
+                  {text.title}
                 </span>
-                <span className="text-xs text-muted-foreground line-clamp-2">{n.message}</span>
+                <span className="text-xs text-muted-foreground line-clamp-2">{text.message}</span>
               </Link>
             </DropdownMenuItem>
-          ))}
+            );
+          })}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

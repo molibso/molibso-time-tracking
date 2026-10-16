@@ -22,13 +22,7 @@ const EMPLOYEE_VIEW: RoleView = {
   badgeVariant: "default",
   dashboardTitle: "Your workspace",
   dashboardSubtitle: "Clock in, track hours, and request leave.",
-  capabilities: [
-    "Clock in / out and take breaks",
-    "View your time tracking history",
-    "Request leave and see your balance",
-    "View your attendance calendar",
-    "View and update assigned tasks",
-  ],
+  capabilities: ["cap.clock", "cap.history", "cap.leave", "cap.calendar", "cap.tasks"],
   pageCopy: {
     leave: "Request time off and track your balance. Bosses review requests.",
     attendance: "Your presence and absences at a glance.",
@@ -44,12 +38,12 @@ const BOSS_VIEW: RoleView = {
   dashboardTitle: "Team overview",
   dashboardSubtitle: "See everyone, approve leave and corrections, and keep the team on track.",
   capabilities: [
-    "Everything an employee can do",
-    "See all team members’ availability and hours",
-    "Approve leave and time correction requests for everyone",
-    "Add and manage all employees",
-    "View analytics and company settings",
-    "Assign tasks and track project delivery",
+    "cap.bossAll",
+    "cap.bossHours",
+    "cap.bossApprove",
+    "cap.bossPeople",
+    "cap.bossAnalytics",
+    "cap.bossTasks",
   ],
   pageCopy: {
     leave: "Your own leave requests, plus approvals for the whole team.",

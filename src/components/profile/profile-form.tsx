@@ -10,9 +10,11 @@ import { updateOwnProfile } from "@/actions/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export function ProfileForm({ defaultValues }: { defaultValues: EmployeeProfileInput }) {
   const router = useRouter();
+  const { t } = useLocale();
   const {
     register,
     handleSubmit,
@@ -33,7 +35,7 @@ export function ProfileForm({ defaultValues }: { defaultValues: EmployeeProfileI
     <form onSubmit={handleSubmit(onSubmit)} className="max-w-md space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="phone">Phone number</Label>
-        <Input id="phone" placeholder="+1 555 123 4567" {...register("phone")} />
+        <Input id="phone" placeholder={t("ph.phone")} {...register("phone")} />
         {errors.phone && <p className="text-xs text-danger">{errors.phone.message}</p>}
       </div>
       <div className="space-y-1.5">

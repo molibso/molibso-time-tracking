@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Loader2, Plus } from "lucide-react";
 import { leaveRequestSchema, type LeaveRequestInput } from "@/lib/validations/leave";
 import { createLeaveRequest } from "@/actions/leave";
+import { useLocale } from "@/components/layout/locale-provider";
+import { LEAVE_KINDS, leaveKindKey } from "@/lib/i18n/labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +27,7 @@ import {
 
 export function LeaveRequestDialog() {
   const router = useRouter();
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const {
     register,
@@ -50,31 +53,34 @@ export function LeaveRequestDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="h-4 w-4" /> Request leave
+          <Plus className="h-4 w-4" /> {t("leave.request")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Request leave</DialogTitle>
-          <DialogDescription>Submit a new leave request for your manager to review.</DialogDescription>
+          <DialogTitle>{t("leave.requestTitle")}</DialogTitle>
+          <DialogDescription>{t("leave.requestDescription")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Type</Label>
+            <Label>{t("leave.col.type")}</Label>
             <Controller
               control={control}
               name="type"
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select leave type" />
+                    <SelectValue placeholder={t("ph.selectLeaveType")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="VACATION">Vacation</SelectItem>
-                    <SelectItem value="SICK">Sick leave</SelectItem>
-                    <SelectItem value="PERSONAL">Personal leave</SelectItem>
-                    <SelectItem value="HALF_DAY">Half day</SelectItem>
-                    <SelectItem value="WORK_FROM_HOME">Work from home</SelectItem>
+                    {LEAVE_KINDS.map((kind) => {
+                      const key = leaveKindKey(kind);
+                      return (
+                        <SelectItem key={kind} value={kind}>
+                          {key ? t(key) : kind}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
@@ -84,29 +90,29 @@ export function LeaveRequestDialog() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="startDate">Start date</Label>
+              <Label htmlFor="startDate">{t("leave.startDate")}</Label>
               <Input id="startDate" type="date" {...register("startDate", { setValueAs: (v) => new Date(v) })} />
               {errors.startDate && <p className="text-xs text-danger">{errors.startDate.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="endDate">End date</Label>
+              <Label htmlFor="endDate">{t("leave.endDate")}</Label>
               <Input id="endDate" type="date" {...register("endDate", { setValueAs: (v) => new Date(v) })} />
               {errors.endDate && <p className="text-xs text-danger">{errors.endDate.message}</p>}
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="reason">Reason (optional)</Label>
-            <Textarea id="reason" placeholder="Add context for your manager" {...register("reason")} />
+            <Label htmlFor="reason">{t("leave.reason")}</Label>
+            <Textarea id="reason" placeholder={t("ph.leaveReason")} {...register("reason")} />
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Submit request
+              {t("leave.submit")}
             </Button>
           </DialogFooter>
         </form>

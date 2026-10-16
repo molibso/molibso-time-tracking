@@ -1,6 +1,9 @@
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import authConfig from "@/lib/auth.config";
 import { canAccessRoute } from "@/lib/rbac";
+
+const { auth } = NextAuth(authConfig);
 
 const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
 

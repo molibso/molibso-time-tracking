@@ -27,25 +27,61 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-surface p-6 shadow-elevated animate-slide-up max-h-[90vh] overflow-y-auto",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground focus:outline-none">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
+>(({ className, children, onPointerDownOutside, onInteractOutside, onEscapeKeyDown, ...props }, ref) => {
+  const [nudgeClose, setNudgeClose] = React.useState(false);
+  const nudgeTimer = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (nudgeTimer.current != null) window.clearTimeout(nudgeTimer.current);
+    };
+  }, []);
+
+  function pulseCloseButton() {
+    setNudgeClose(true);
+    if (nudgeTimer.current != null) window.clearTimeout(nudgeTimer.current);
+    nudgeTimer.current = window.setTimeout(() => setNudgeClose(false), 2500);
+  }
+
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-surface p-6 shadow-elevated animate-dialog-in max-h-[90vh] overflow-y-auto",
+          className
+        )}
+        {...props}
+        onPointerDownOutside={(event) => {
+          event.preventDefault();
+          pulseCloseButton();
+          onPointerDownOutside?.(event);
+        }}
+        onInteractOutside={(event) => {
+          event.preventDefault();
+          onInteractOutside?.(event);
+        }}
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+          pulseCloseButton();
+          onEscapeKeyDown?.(event);
+        }}
+      >
+        {children}
+        <DialogPrimitive.Close
+          className={cn(
+            "absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition-colors duration-200 hover:bg-surface-hover hover:text-foreground focus:outline-none",
+            nudgeClose && "bg-surface-hover text-foreground",
+          )}
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
+});
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

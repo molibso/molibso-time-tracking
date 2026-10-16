@@ -1,5 +1,5 @@
 /**
- * Deletes all application data from Supabase (keeps schema / migrations).
+ * Deletes all application data from PostgreSQL (keeps schema / migrations).
  * Run: npx tsx scripts/wipe-data.ts
  */
 import { PrismaClient } from "@prisma/client";

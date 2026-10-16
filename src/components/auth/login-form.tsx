@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLocale();
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,7 +37,7 @@ export function LoginForm() {
     setIsSubmitting(false);
 
     if (result?.error) {
-      setServerError("Incorrect email or password.");
+      setServerError(t("login.error"));
       return;
     }
     router.push(searchParams.get("callbackUrl") ?? "/dashboard");
@@ -45,10 +47,8 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Welcome back</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Sign in to your molibso Internal workspace
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("login.welcome")}</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">{t("login.subtitle")}</p>
       </div>
 
       {serverError && (
@@ -60,11 +60,11 @@ export function LoginForm() {
 
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="email">Work email</Label>
+          <Label htmlFor="email">{t("login.email")}</Label>
           <Input
             id="email"
             type="email"
-            placeholder="you@molibso.de"
+            placeholder={t("ph.emailWork")}
             autoComplete="email"
             className="h-11 rounded-xl"
             {...register("email")}
@@ -74,9 +74,9 @@ export function LoginForm() {
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("login.password")}</Label>
             <Link href="/forgot-password" className="text-xs font-medium text-petrol hover:underline">
-              Forgot password?
+              {t("login.forgot")}
             </Link>
           </div>
           <Input
@@ -92,7 +92,7 @@ export function LoginForm() {
 
       <Button type="submit" className="h-11 w-full" disabled={isSubmitting}>
         {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-        Sign in
+        {isSubmitting ? t("login.submitting") : t("login.signIn")}
       </Button>
     </form>
   );

@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { visibleNavItems } from "./nav-config";
+import { isNavActive, useCurrentPath } from "./navigation-pending";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export function Sidebar({ role }: { role: Role }) {
-  const pathname = usePathname();
+  const pathname = useCurrentPath();
+  const { t } = useLocale();
   const items = visibleNavItems(role);
 
   return (
@@ -15,17 +17,18 @@ export function Sidebar({ role }: { role: Role }) {
       <div className="flex h-[72px] items-center gap-2.5 px-6">
         <span className="text-xl font-bold lowercase tracking-tight text-petrol">molibso</span>
         <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-petrol">
-          Internal
+          {t("common.internal")}
         </span>
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3 py-1">
         {items.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const active = isNavActive(item.href, pathname);
           return (
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               className={cn(
                 "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 active
@@ -39,7 +42,7 @@ export function Sidebar({ role }: { role: Role }) {
                   active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                 )}
               />
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           );
         })}

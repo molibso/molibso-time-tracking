@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-table";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useLocale } from "@/components/layout/locale-provider";
 import { ArrowUpDown, MoreHorizontal, Plus, Search, UserX } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "danger" | "muted">
 
 export function EmployeeTable({ data }: { data: EmployeeRow[] }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([{ id: "firstName", desc: false }]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -183,7 +185,7 @@ export function EmployeeTable({ data }: { data: EmployeeRow[] }) {
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search team…"
+            placeholder={t("ph.searchTeam")}
             className="pl-9"
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}

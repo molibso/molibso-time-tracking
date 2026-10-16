@@ -12,6 +12,12 @@ export async function notifyAdminsOfOvertime(opts: {
 }) {
   if (opts.overtimeMinutes < OVERTIME_NOTIFY_MINUTES) return;
 
+  const settings = await prisma.companySettings.findUnique({
+    where: { id: "global" },
+    select: { notifyOvertimeAlert: true },
+  });
+  if (settings && !settings.notifyOvertimeAlert) return;
+
   const [employee, attendance] = await Promise.all([
     prisma.employee.findUnique({
       where: { id: opts.employeeId },

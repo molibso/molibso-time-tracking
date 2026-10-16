@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { intlLocale, type Locale } from "@/lib/i18n/messages";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -80,17 +81,41 @@ export function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-export function formatDate(date: Date | string, opts: Intl.DateTimeFormatOptions = {}): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    ...opts,
-  });
+/** Date-only values stored at UTC midnight stay on that calendar day in every timezone. */
+export function calendarDate(date: Date | string): Date {
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}(?:$|T00:00:00(?:\.000)?Z$)/.test(date)) {
+    const [year, month, day] = date.slice(0, 10).split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+  const value = new Date(date);
+  if (
+    value.getUTCHours() === 0 &&
+    value.getUTCMinutes() === 0 &&
+    value.getUTCSeconds() === 0 &&
+    value.getUTCMilliseconds() === 0
+  ) {
+    return new Date(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
+  }
+  return value;
 }
 
-export function formatTime(date: Date | string, withSeconds = false): string {
-  return new Date(date).toLocaleTimeString("en-US", {
+/** Numeric day-month-year, so German, French, and English show the same order. */
+export function formatDate(date: Date | string, locale: Locale = "en"): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(calendarDate(date));
+}
+
+export function formatDateRange(start: Date | string, end: Date | string, locale: Locale = "en"): string {
+  const from = formatDate(start, locale);
+  const to = formatDate(end, locale);
+  return from === to ? from : `${from} – ${to}`;
+}
+
+export function formatTime(date: Date | string, withSeconds = false, locale: Locale = "en"): string {
+  return new Date(date).toLocaleTimeString(intlLocale(locale), {
     hour: "2-digit",
     minute: "2-digit",
     ...(withSeconds ? { second: "2-digit" } : {}),

@@ -16,11 +16,12 @@ export async function POST(req: NextRequest) {
     });
     if (!openEntry) return fail("You're not currently clocked in.", 409);
 
-    if (openEntry.breaks.some((b) => !b.endedAt)) {
-      return fail("End your current break before clocking out.", 409);
+    const now = new Date();
+    const openBreak = openEntry.breaks.find((b) => !b.endedAt);
+    if (openBreak) {
+      await prisma.break.update({ where: { id: openBreak.id }, data: { endedAt: now } });
     }
 
-    const now = new Date();
     const entry = await prisma.clockEntry.update({
       where: { id: openEntry.id },
       data: { clockOut: now },

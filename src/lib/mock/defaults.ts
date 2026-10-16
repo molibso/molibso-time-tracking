@@ -73,6 +73,7 @@ export const MODEL_DEFAULTS: Partial<Record<keyof Store, Record<string, unknown>
     notifyClockOutReminder: true,
     notifyBreakReminder: true,
     notifyLeaveUpdates: true,
+    notifyOvertimeAlert: true,
   },
   holidays: {
     isPaid: true,

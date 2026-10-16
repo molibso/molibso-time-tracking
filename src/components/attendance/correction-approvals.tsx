@@ -8,6 +8,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Button } from "@/components/ui/button";
 import { reviewCorrectionRequest } from "@/actions/leave";
 import { formatDate, formatTime } from "@/lib/utils";
+import { useLocale } from "@/components/layout/locale-provider";
 
 export interface PendingCorrection {
   id: string;
@@ -20,6 +21,7 @@ export interface PendingCorrection {
 
 export function CorrectionApprovals({ items }: { items: PendingCorrection[] }) {
   const router = useRouter();
+  const { locale } = useLocale();
   const [isPending, startTransition] = useTransition();
 
   function review(id: string, status: "APPROVED" | "REJECTED") {
@@ -53,11 +55,11 @@ export function CorrectionApprovals({ items }: { items: PendingCorrection[] }) {
         {items.map((c) => (
           <TableRow key={c.id}>
             <TableCell className="font-medium">{c.employeeName}</TableCell>
-            <TableCell>{formatDate(c.date)}</TableCell>
+            <TableCell className="tabular-nums">{formatDate(c.date, locale)}</TableCell>
             <TableCell className="text-sm text-muted-foreground">
-              {c.requestedClockIn && `In ${formatTime(c.requestedClockIn)}`}
+              {c.requestedClockIn && `In ${formatTime(c.requestedClockIn, false, locale)}`}
               {c.requestedClockIn && c.requestedClockOut && " · "}
-              {c.requestedClockOut && `Out ${formatTime(c.requestedClockOut)}`}
+              {c.requestedClockOut && `Out ${formatTime(c.requestedClockOut, false, locale)}`}
             </TableCell>
             <TableCell className="max-w-xs truncate text-sm text-muted-foreground">{c.reason}</TableCell>
             <TableCell>
