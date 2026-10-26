@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { TASK_PRIORITIES, taskPriorityKey } from "@/lib/i18n/labels";
+import { PeoplePicker } from "@/components/tasks/people-picker";
 
 export interface TaskFormOption {
   id: string;
@@ -33,10 +34,15 @@ export interface TaskFormOption {
 export function TaskFormDialog({
   employees,
   projects,
+  intent = "task",
+  defaultAssigneeId,
 }: {
   employees: TaskFormOption[];
   projects: TaskFormOption[];
+  intent?: "task" | "meeting";
+  defaultAssigneeId?: string;
 }) {
+  const isMeeting = intent === "meeting";
   const router = useRouter();
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
@@ -47,19 +53,25 @@ export function TaskFormDialog({
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<TaskInput>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
       priority: "MEDIUM",
       status: "TODO",
+      kind: isMeeting ? "MEETING" : "TASK",
+      assigneeIds: defaultAssigneeId ? [defaultAssigneeId] : [],
     },
   });
+  const kind = watch("kind");
+  const meetingTask = isMeeting || kind === "MEETING";
 
   async function onSubmit(data: TaskInput) {
     startTransition(async () => {
       const result = await createTask({
         ...data,
+        kind: isMeeting ? "MEETING" : data.kind,
         projectId: data.projectId || null,
         dueDate: data.dueDate || null,
         estimatedHours: data.estimatedHours || null,
@@ -79,18 +91,18 @@ export function TaskFormDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="h-4 w-4" /> {t("tasks.assign")}
+          <Plus className="h-4 w-4" /> {isMeeting ? t("meetings.create") : t("tasks.assign")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{t("tasks.assignTitle")}</DialogTitle>
-          <DialogDescription>{t("tasks.assignDescription")}</DialogDescription>
+          <DialogTitle>{isMeeting ? t("meetings.createTitle") : t("tasks.assignTitle")}</DialogTitle>
+          <DialogDescription>{isMeeting ? t("meetings.createDescription") : t("tasks.assignDescription")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="title">{t("tasks.field.title")}</Label>
-            <Input id="title" {...register("title")} />
+            <Input id="title" placeholder={isMeeting ? t("meetings.placeholder") : undefined} {...register("title")} />
             {errors.title && <p className="text-xs text-danger">{errors.title.message}</p>}
           </div>
 
@@ -99,31 +111,41 @@ export function TaskFormDialog({
             <Textarea id="description" rows={3} {...register("description")} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+          {!isMeeting && (
+            <Controller
+              control={control}
+              name="kind"
+              render={({ field }) => (
+                <label className="flex items-start gap-2.5 rounded-xl border border-border px-3 py-2.5 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-[#00425a]"
+                    checked={field.value === "MEETING"}
+                    onChange={(event) => field.onChange(event.target.checked ? "MEETING" : "TASK")}
+                  />
+                  <span>
+                    <span className="font-medium">{t("tasks.field.meeting")}</span>
+                    <span className="mt-0.5 block text-muted-foreground">{t("tasks.meetingHint")}</span>
+                  </span>
+                </label>
+              )}
+            />
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
               <Label>{t("tasks.field.assignTo")}</Label>
               <Controller
                 control={control}
-                name="assigneeId"
+                name="assigneeIds"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("common.selectTeammate")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {employees.map((e) => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <PeoplePicker people={employees} value={field.value ?? []} onChange={field.onChange} />
                 )}
               />
-              {errors.assigneeId && <p className="text-xs text-danger">{errors.assigneeId.message}</p>}
+              {errors.assigneeIds && <p className="text-sm text-danger">{errors.assigneeIds.message}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label>{t("tasks.field.project")}</Label>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>{meetingTask ? t("meetings.project") : t("tasks.field.project")}</Label>
               <Controller
                 control={control}
                 name="projectId"
@@ -133,7 +155,7 @@ export function TaskFormDialog({
                       <SelectValue placeholder={t("ph.optional")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">{t("tasks.field.noProject")}</SelectItem>
+                      {!meetingTask && <SelectItem value="">{t("tasks.field.noProject")}</SelectItem>}
                       {projects.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.label}
@@ -143,6 +165,7 @@ export function TaskFormDialog({
                   </Select>
                 )}
               />
+              {errors.projectId && <p className="text-sm text-danger">{errors.projectId.message}</p>}
             </div>
           </div>
 
@@ -193,7 +216,7 @@ export function TaskFormDialog({
             </Button>
             <Button type="submit" disabled={isSubmitting || isPending}>
               {(isSubmitting || isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t("tasks.assignAction")}
+              {isMeeting ? t("meetings.create") : t("tasks.assignAction")}
             </Button>
           </DialogFooter>
         </form>

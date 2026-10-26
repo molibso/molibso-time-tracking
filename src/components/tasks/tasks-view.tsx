@@ -5,6 +5,7 @@ import { LayoutGrid, List } from "lucide-react";
 import { ProjectEditButton } from "@/components/tasks/project-form-dialog";
 import { TaskBoard } from "@/components/tasks/task-board";
 import { TaskTable, type TaskRow } from "@/components/tasks/task-table";
+import type { TaskFormOption } from "@/components/tasks/task-form-dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/components/layout/locale-provider";
@@ -18,14 +19,19 @@ export type ProjectChip = {
   name: string;
   description: string | null;
   taskCount: number;
+  memberIds: string[];
 };
 
 export function TasksView({
   rows,
   projects,
+  employees,
+  selfId,
 }: {
   rows: TaskRow[];
   projects: ProjectChip[];
+  employees: TaskFormOption[];
+  selfId: string;
 }) {
   const { t } = useLocale();
   const [view, setView] = useState<ViewMode>("list");
@@ -99,6 +105,8 @@ export function TasksView({
                   </button>
                   <ProjectEditButton
                     project={project}
+                    employees={employees}
+                    selfId={selfId}
                     onDeleted={(id) => {
                       if (projectId === id) setProjectId(null);
                     }}

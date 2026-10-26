@@ -4,23 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
 import { startOfDay, endOfDay, startOfWeek } from "@/lib/utils";
 import { getLocale } from "@/lib/i18n/get-locale";
-import { intlLocale, translate, type MessageKey } from "@/lib/i18n/messages";
+import { intlLocale, translate } from "@/lib/i18n/messages";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   AttendanceTrendChart,
   OvertimeChart,
-  UtilizationChart,
-  VacationUsageChart,
   ProjectHoursChart,
 } from "@/components/charts/analytics-charts";
-
-function leaveTypeLabel(type: string): MessageKey {
-  if (type === "SICK") return "leaveType.sick";
-  if (type === "PERSONAL") return "leaveType.personal";
-  if (type === "HALF_DAY") return "leaveType.halfDay";
-  if (type === "WORK_FROM_HOME") return "leaveType.wfh";
-  return "leaveType.vacation";
-}
 
 export default async function AnalyticsPage() {
   const session = await auth();
@@ -28,7 +18,6 @@ export default async function AnalyticsPage() {
 
   const locale = await getLocale();
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const projectRangeStart = startOfDay(new Date(now.getTime() - 89 * 86400000));
 
   const trendDays = Array.from({ length: 14 }, (_, index) => {
@@ -60,26 +49,10 @@ export default async function AnalyticsPage() {
     Math.max(overtimeWeeks[overtimeWeeks.length - 1].end.getTime(), trendDays[trendDays.length - 1].end.getTime()),
   );
 
-  const [rows, employees, workedByEmployee, vacationAgg, projectTimeEntries] = await Promise.all([
+  const [rows, projectTimeEntries] = await Promise.all([
     prisma.attendance.findMany({
       where: { date: { gte: rangeStart, lte: rangeEnd } },
       select: { date: true, status: true, overtimeMinutes: true },
-    }),
-    prisma.employee.findMany({
-      where: { status: "ACTIVE" },
-      select: { id: true, firstName: true, lastName: true, weeklyHours: true },
-      take: 10,
-      orderBy: { firstName: "asc" },
-    }),
-    prisma.attendance.groupBy({
-      by: ["employeeId"],
-      where: { date: { gte: monthStart } },
-      _sum: { totalWorkedMinutes: true },
-    }),
-    prisma.leaveRequest.groupBy({
-      by: ["type"],
-      where: { status: "APPROVED" },
-      _sum: { totalDays: true },
     }),
     prisma.taskTimeEntry.findMany({
       where: {
@@ -115,20 +88,9 @@ export default async function AnalyticsPage() {
     }
   }
 
-  const workedMinutes = new Map(workedByEmployee.map((row) => [row.employeeId, row._sum.totalWorkedMinutes ?? 0]));
-  const utilization = employees.map((e) => {
-    const expectedMinutes = e.weeklyHours * 60 * 4.33;
-    const pct = expectedMinutes > 0 ? Math.min(120, Math.round((workedMinutes.get(e.id) ?? 0) / expectedMinutes * 100)) : 0;
-    return { name: `${e.firstName} ${e.lastName}`, utilization: pct };
-  });
-
   const overtimeChart = overtimeWeeks.map((week) => ({
     week: week.week,
     overtimeHours: +(week.overtimeMinutes / 60).toFixed(1),
-  }));
-  const vacationData = vacationAgg.map((v) => ({
-    name: translate(locale, leaveTypeLabel(v.type)),
-    value: v._sum.totalDays ?? 0,
   }));
 
   const projectSeconds = new Map<string, { name: string; seconds: number }>();
@@ -211,32 +173,6 @@ export default async function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <OvertimeChart data={overtimeChart} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Employee utilization (this month)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {utilization.length > 0 ? (
-              <UtilizationChart data={utilization} />
-            ) : (
-              <p className="py-10 text-center text-sm text-muted-foreground">Not enough data yet.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Vacation & leave usage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {vacationData.length > 0 ? (
-              <VacationUsageChart data={vacationData} />
-            ) : (
-              <p className="py-10 text-center text-sm text-muted-foreground">No approved leave recorded yet.</p>
-            )}
           </CardContent>
         </Card>
       </div>

@@ -5,6 +5,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ProfileForm } from "@/components/profile/profile-form";
+import { PasswordForm } from "@/components/profile/password-form";
+import { translate } from "@/lib/i18n/messages";
 import { initials, formatDate, formatTime } from "@/lib/utils";
 import { getLocale } from "@/lib/i18n/get-locale";
 
@@ -29,8 +31,8 @@ export default async function ProfilePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
-        <p className="text-sm text-muted-foreground">Your details, schedule, and account settings.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{translate(locale, "profile.title")}</h1>
+        <p className="text-base text-muted-foreground">{translate(locale, "profile.subtitle")}</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -71,14 +73,25 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Edit profile</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ProfileForm defaultValues={{ phone: employee.phone ?? "", avatarUrl: employee.avatarUrl ?? "" }} />
-          </CardContent>
-        </Card>
+        <div className="space-y-4 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Edit profile</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ProfileForm defaultValues={{ phone: employee.phone ?? "", avatarUrl: employee.avatarUrl ?? "" }} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>{translate(locale, "profile.passwordTitle")}</CardTitle>
+              <p className="text-base text-muted-foreground">{translate(locale, "profile.passwordHint")}</p>
+            </CardHeader>
+            <CardContent>
+              <PasswordForm />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Card>

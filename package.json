@@ -13,7 +13,7 @@
     "db:push": "prisma db push",
     "db:setup": "prisma migrate deploy && npm run db:seed",
     "db:setup:dev": "prisma migrate dev && npm run db:seed",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
     "db:up": "docker compose up -d",
@@ -79,6 +79,6 @@
     "typescript": "^5.7.2"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "node --env-file=.env --import tsx prisma/seed.ts"
   }
 }

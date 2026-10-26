@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { emptyShiftCopy, monthTitle, weekTitle, type ShiftPeriod } from "@/lib/shift-period";
 import { intlLocale, translate, type Locale } from "@/lib/i18n/messages";
 import { formatDate, formatDuration, formatTime, startOfMonth, startOfWeek } from "@/lib/utils";
+import { balanceSeconds, formatBalance } from "@/lib/day-balance";
 import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
 
 type ShiftEntry = {
@@ -15,7 +16,6 @@ type ShiftEntry = {
 type ShiftDay = {
   id: string;
   date: Date;
-  overtimeMinutes: number;
   clockEntries: ShiftEntry[];
 };
 
@@ -59,7 +59,7 @@ export function ShiftHistory({
         dateLabel: string;
         worked: number;
         breakSeconds: number;
-        overtimeSeconds: number;
+        balance: number;
         sessions: { id: string; label: string }[];
       }[];
     }[];
@@ -95,7 +95,7 @@ export function ShiftHistory({
       dateLabel: formatDate(date, locale),
       worked,
       breakSeconds,
-      overtimeSeconds: Math.max(0, day.overtimeMinutes * 60),
+      balance: worked > 0 ? balanceSeconds(worked) : 0,
       sessions: entries.map((entry) => ({ id: entry.id, label: sessionLabel(entry) })),
     });
   }
@@ -149,8 +149,10 @@ export function ShiftHistory({
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold tabular-nums">{formatDuration(day.worked)}</span>
-                        {day.overtimeSeconds > 0 && <Badge variant="warning">{formatDuration(day.overtimeSeconds)}</Badge>}
+                        <span className="text-base font-semibold tabular-nums">{formatDuration(day.worked)}</span>
+                        {day.worked > 0 && day.balance !== 0 && (
+                          <Badge variant={day.balance > 0 ? "success" : "danger"}>{formatBalance(day.balance)}</Badge>
+                        )}
                         {isSelf && <CorrectionRequestDialog attendanceId={day.id} date={day.dateLabel} />}
                       </div>
                     </div>

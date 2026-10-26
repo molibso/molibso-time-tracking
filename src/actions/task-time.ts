@@ -30,13 +30,25 @@ async function stopOpenTimer(employeeId: string) {
   return open.id;
 }
 
+function refreshTracked() {
+  revalidatePath("/tasks");
+  revalidatePath("/meetings");
+}
+
 async function assertCanTrackTask(taskId: string, employeeId: string) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { assigneeId: true, status: true, title: true },
+    select: {
+      assigneeId: true,
+      status: true,
+      title: true,
+      assignments: { select: { employeeId: true } },
+    },
   });
   if (!task) throw new Error("Task not found.");
-  if (task.assigneeId !== employeeId) {
+  const assigned =
+    task.assigneeId === employeeId || task.assignments.some((assignment) => assignment.employeeId === employeeId);
+  if (!assigned) {
     throw new Error("You can only track time on tasks assigned to you.");
   }
   if (task.status === TaskStatus.DONE) {
@@ -73,7 +85,7 @@ export async function startTaskTimer(taskId: string): Promise<ActionResult & { s
         : []),
     ]);
 
-    revalidatePath("/tasks");
+    refreshTracked();
     return {
       success: true,
       message: `Timer started on "${task.title}".`,
@@ -106,7 +118,7 @@ export async function stopTaskTimer(taskId?: string): Promise<ActionResult & { e
       data: { endedAt, durationSeconds },
     });
 
-    revalidatePath("/tasks");
+    refreshTracked();
     return { success: true, message: `Stopped timer on "${open.task.title}".`, entryId: open.id };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to stop timer" };
@@ -134,9 +146,40 @@ export async function saveTimeEntryNote(entryId: string, note: string): Promise<
       data: { note: text },
     });
 
-    revalidatePath("/tasks");
+    refreshTracked();
     return { success: true, message: "Note saved." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to save note" };
+  }
+}
+
+/** Applies a new duration immediately. The person who logged the time can correct their own session. */
+export async function correctTaskTime(entryId: string, durationMinutes: number): Promise<ActionResult> {
+  try {
+    const { employeeId } = await requireEmployee();
+    const minutes = Math.round(durationMinutes);
+    if (!Number.isFinite(minutes) || minutes < 0 || minutes > 24 * 60) {
+      return { success: false, error: "Enter a duration between 0 minutes and 24 hours." };
+    }
+
+    const entry = await prisma.taskTimeEntry.findUnique({ where: { id: entryId } });
+    if (!entry || entry.employeeId !== employeeId) {
+      return { success: false, error: "That session could not be found." };
+    }
+    if (!entry.endedAt) return { success: false, error: "Stop the timer before correcting it." };
+
+    const durationSeconds = minutes * 60;
+    await prisma.taskTimeEntry.update({
+      where: { id: entryId },
+      data: {
+        durationSeconds,
+        endedAt: new Date(entry.startedAt.getTime() + durationSeconds * 1000),
+      },
+    });
+
+    refreshTracked();
+    return { success: true, message: "Time updated." };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "Failed to update time" };
   }
 }

@@ -14,6 +14,8 @@ import { WorkedHoursKpis } from "@/components/dashboard/worked-hours-kpis";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { translate } from "@/lib/i18n/messages";
+import { balanceSeconds, formatBalance } from "@/lib/day-balance";
+import { sumWorkedSeconds } from "@/lib/worked-time";
 
 export default async function TimeTrackingPage({
   searchParams,
@@ -47,6 +49,16 @@ export default async function TimeTrackingPage({
     getTodayWorkedBreakdown(employeeId),
     getVacationBalance(employeeId),
   ]);
+
+  const rangeBalance = attendances.reduce((sum, day) => {
+    const worked = day.clockEntries.length > 0 ? sumWorkedSeconds(day.clockEntries) : Math.max(0, day.totalWorkedMinutes) * 60;
+    if (worked <= 0) return sum;
+    return sum + balanceSeconds(worked);
+  }, 0);
+  const workedDays = attendances.filter((day) => {
+    const worked = day.clockEntries.length > 0 ? sumWorkedSeconds(day.clockEntries) : day.totalWorkedMinutes;
+    return worked > 0;
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -96,7 +108,17 @@ export default async function TimeTrackingPage({
             />
           </Suspense>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3">
+            <p className="text-base text-muted-foreground">{translate(locale, "time.balanceHint")}</p>
+            <p className={`text-lg font-semibold tabular-nums ${rangeBalance > 0 ? "text-success" : rangeBalance < 0 ? "text-danger" : ""}`}>
+              {workedDays === 0
+                ? translate(locale, "time.balanceEmpty")
+                : rangeBalance === 0
+                  ? translate(locale, "time.balanceEven")
+                  : formatBalance(rangeBalance)}
+            </p>
+          </div>
           <ShiftHistory days={attendances} isSelf={view.isSelf} period={range.period} locale={locale} />
         </CardContent>
       </Card>

@@ -8,6 +8,7 @@ import { TaskPriority } from "@prisma/client";
 import { updateTaskStatus } from "@/actions/tasks";
 import { SubtaskFormDialog } from "@/components/tasks/subtask-form-dialog";
 import { TaskTimerButton } from "@/components/tasks/task-timer-button";
+import { TimeCorrectionForm } from "@/components/tasks/time-correction-form";
 import type { TaskRow } from "@/components/tasks/task-table";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -240,6 +241,42 @@ export function TaskDetailDialog({
                     </li>
                   );
                 })}
+              </ul>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              {t("tasks.loggedTime")}
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal tabular-nums text-muted-foreground">
+                {task.sessions.length}
+              </span>
+            </h3>
+            <p className="text-sm text-muted-foreground">{t("tasks.correctHint")}</p>
+            {task.sessions.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                {t("tasks.noSessions")}
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {task.sessions.map((entry) => (
+                  <li key={entry.id} className="space-y-2 rounded-xl border border-border px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <span className="tabular-nums">{formatDate(entry.startedAt, locale)}</span>
+                      {entry.durationSeconds != null && (
+                        <span className="font-medium tabular-nums text-foreground">{formatDuration(entry.durationSeconds)}</span>
+                      )}
+                      {entry.subtaskTitle && (
+                        <span className="rounded-full bg-petrol/10 px-2 py-0.5 text-petrol">{entry.subtaskTitle}</span>
+                      )}
+                    </div>
+                    {entry.note && <p className="text-sm leading-relaxed">{entry.note}</p>}
+                    {entry.canCorrect && entry.durationSeconds != null && (
+                      <TimeCorrectionForm entryId={entry.id} durationSeconds={entry.durationSeconds} />
+                    )}
+                  </li>
+                ))}
               </ul>
             )}
           </section>

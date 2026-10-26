@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, formatDuration } from "@/lib/utils";
+import { FULL_DAY_SECONDS, formatBalance, balanceSeconds } from "@/lib/day-balance";
 import { useLocale } from "@/components/layout/locale-provider";
 import { intlLocale, type MessageKey } from "@/lib/i18n/messages";
 
@@ -13,9 +14,7 @@ export interface AttendanceDay {
   workedSeconds: number;
 }
 
-/** A present day is green only after a full 8 hours. Shorter present days are reddish. */
-const FULL_DAY_SECONDS = 8 * 60 * 60;
-
+/** A present day is green once it reaches a full 8 hours. Shorter present days are reddish. */
 const FULL_DAY_STYLE = "bg-success/15 text-success border-success/30";
 const SHORT_DAY_STYLE = "bg-danger/15 text-danger border-danger/30";
 
@@ -40,7 +39,7 @@ const LEGEND: { labelKey: MessageKey; className: string }[] = [
 ];
 
 function cellStyle(day: AttendanceDay): string {
-  if (day.status === "PRESENT") return day.workedSeconds > FULL_DAY_SECONDS ? FULL_DAY_STYLE : SHORT_DAY_STYLE;
+  if (day.status === "PRESENT") return day.workedSeconds >= FULL_DAY_SECONDS ? FULL_DAY_STYLE : SHORT_DAY_STYLE;
   return STATUS_STYLE[day.status];
 }
 
@@ -89,7 +88,7 @@ export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
         </div>
       </div>
 
-      <div className="mb-3 grid grid-cols-7 gap-3 text-center text-sm font-medium text-muted-foreground">
+      <div className="mb-3 grid grid-cols-7 gap-3 text-center text-base font-medium text-muted-foreground">
         {Array.from({ length: 7 }, (_, index) => {
           const date = new Date(2026, 0, 5 + index);
           const label = date.toLocaleDateString(intlLocale(locale), { weekday: "short" });
@@ -107,13 +106,20 @@ export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
               key={i}
               title={entry && showTime ? formatDuration(entry.workedSeconds) : undefined}
               className={cn(
-                "flex min-h-[8.5rem] flex-col items-center justify-center gap-1.5 rounded-xl border px-1.5 py-3",
+                "flex min-h-[10.5rem] flex-col items-center justify-center gap-1.5 rounded-xl border px-1.5 py-3",
                 entry ? cellStyle(entry) : "border-border text-foreground/70",
               )}
             >
-              <span className="text-lg font-medium leading-none">{day}</span>
+              <span className="text-2xl font-medium leading-none">{day}</span>
               {showTime && entry && (
-                <span className="text-sm font-medium leading-tight tabular-nums">{compactDuration(entry.workedSeconds)}</span>
+                <>
+                  <span className="text-base font-medium leading-tight tabular-nums">{compactDuration(entry.workedSeconds)}</span>
+                  {entry.workedSeconds > 0 && balanceSeconds(entry.workedSeconds) !== 0 && (
+                    <span className="text-base font-semibold leading-tight tabular-nums">
+                      {formatBalance(balanceSeconds(entry.workedSeconds))}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           );
@@ -122,7 +128,7 @@ export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
 
       <div className="mt-4 flex flex-wrap gap-3">
         {LEGEND.map((item) => (
-          <div key={item.labelKey} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div key={item.labelKey} className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <span className={cn("h-2.5 w-2.5 rounded-full border", item.className)} />
             {t(item.labelKey)}
           </div>

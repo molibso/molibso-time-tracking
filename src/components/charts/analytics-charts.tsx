@@ -5,8 +5,6 @@ import {
   Line,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
   Cell,
   XAxis,
   YAxis,
@@ -55,37 +53,6 @@ export function OvertimeChart({ data }: { data: { week: string; overtimeHours: n
         <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}h`, t("chart.overtime")]} />
         <Bar dataKey="overtimeHours" fill="#F59E0B" radius={[6, 6, 0, 0]} maxBarSize={36} />
       </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-export function UtilizationChart({ data }: { data: { name: string; utilization: number }[] }) {
-  const { t } = useLocale();
-  return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-border" />
-        <XAxis type="number" domain={[0, 100]} tick={axisTick} axisLine={false} tickLine={false} unit="%" />
-        <YAxis type="category" dataKey="name" tick={axisTick} axisLine={false} tickLine={false} width={110} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`, t("chart.utilization")]} />
-        <Bar dataKey="utilization" fill="#4F46E5" radius={[0, 6, 6, 0]} maxBarSize={18} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-export function VacationUsageChart({ data }: { data: { name: string; value: number }[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={2}>
-          {data.map((_, i) => (
-            <Cell key={i} fill={COLORS[i % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip contentStyle={tooltipStyle} />
-        <Legend wrapperStyle={{ fontSize: 12 }} />
-      </PieChart>
     </ResponsiveContainer>
   );
 }

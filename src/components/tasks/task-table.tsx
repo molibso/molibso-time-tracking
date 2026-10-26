@@ -25,6 +25,15 @@ export interface TaskNote {
   subtaskTitle?: string;
 }
 
+export interface TaskSession {
+  id: string;
+  startedAt: string;
+  durationSeconds: number | null;
+  note: string | null;
+  subtaskTitle?: string;
+  canCorrect: boolean;
+}
+
 export interface TaskSubtask {
   id: string;
   title: string;
@@ -49,6 +58,7 @@ export interface TaskRow {
   priority: string;
   dueDate: string | null;
   estimatedHours: number | null;
+  kind: string;
   projectId: string | null;
   projectName: string | null;
   assigneeName: string | null;
@@ -59,6 +69,7 @@ export interface TaskRow {
   canDelete: boolean;
   canTrackTime: boolean;
   notes: TaskNote[];
+  sessions: TaskSession[];
   subtasks: TaskSubtask[];
 }
 
@@ -254,6 +265,11 @@ export function TaskTable({
                           onClick={() => setDetailId(task.id)}
                         >
                           <p className="truncate font-medium text-foreground hover:text-petrol" title={task.description || task.title}>
+                            {task.kind === "MEETING" && (
+                              <span className="mr-1.5 rounded-full bg-petrol/10 px-2 py-0.5 text-xs font-semibold text-petrol">
+                                {t("tasks.kind.meeting")}
+                              </span>
+                            )}
                             {task.title}
                           </p>
                           {(task.notes.length > 0 || task.subtasks.length > 0) && (

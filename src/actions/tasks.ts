@@ -8,29 +8,58 @@ import { notifyUserNewTask } from "@/lib/notifications";
 import { projectSchema, updateProjectSchema, taskSchema, taskStatusSchema } from "@/lib/validations/tasks";
 import type { ActionResult } from "./auth";
 
+function refreshWork() {
+  revalidatePath("/tasks");
+  revalidatePath("/meetings");
+  revalidatePath("/dashboard");
+}
+
 async function requireEmployee() {
   const session = await auth();
   if (!session?.user.employeeId) throw new Error("No employee profile linked to this account.");
   return session;
 }
 
+async function memberIdsFor(
+  currentEmployeeId: string,
+  requested: Array<string | undefined> | undefined,
+): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
+  const ids = Array.from(new Set((requested ?? []).filter((id): id is string => Boolean(id))));
+  if (!ids.includes(currentEmployeeId)) ids.push(currentEmployeeId);
+  const found = await prisma.employee.findMany({
+    where: { id: { in: ids }, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (found.length !== ids.length) {
+    return { ok: false, error: "One of the selected people could not be found." };
+  }
+  return { ok: true, ids };
+}
+
 export async function createProject(input: unknown): Promise<ActionResult & { projectId?: string }> {
   try {
-    await requireEmployee();
+    const session = await requireEmployee();
     const parsed = projectSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
     }
+
+    const employeeId = session.user.employeeId;
+    if (!employeeId) return { success: false, error: "No employee profile linked to this account." };
+    const members = await memberIdsFor(employeeId, parsed.data.memberIds);
+    if (!members.ok) return { success: false, error: members.error };
 
     const project = await prisma.project.create({
       data: {
         name: parsed.data.name,
         description: parsed.data.description,
         status: "ACTIVE",
+        createdById: employeeId,
+        members: { create: members.ids.map((employeeId) => ({ employeeId })) },
       },
     });
 
-    revalidatePath("/tasks");
+    refreshWork();
     return { success: true, projectId: project.id, message: `Project "${project.name}" created.` };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to create project" };
@@ -39,7 +68,7 @@ export async function createProject(input: unknown): Promise<ActionResult & { pr
 
 export async function updateProject(input: unknown): Promise<ActionResult> {
   try {
-    await requireEmployee();
+    const session = await requireEmployee();
     const parsed = updateProjectSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -48,15 +77,26 @@ export async function updateProject(input: unknown): Promise<ActionResult> {
     const existing = await prisma.project.findUnique({ where: { id: parsed.data.id } });
     if (!existing) return { success: false, error: "Project not found." };
 
-    await prisma.project.update({
-      where: { id: parsed.data.id },
-      data: {
-        name: parsed.data.name,
-        description: parsed.data.description,
-      },
-    });
+    const employeeId = session.user.employeeId;
+    if (!employeeId) return { success: false, error: "No employee profile linked to this account." };
+    const members = await memberIdsFor(employeeId, parsed.data.memberIds);
+    if (!members.ok) return { success: false, error: members.error };
 
-    revalidatePath("/tasks");
+    await prisma.$transaction([
+      prisma.project.update({
+        where: { id: parsed.data.id },
+        data: {
+          name: parsed.data.name,
+          description: parsed.data.description,
+        },
+      }),
+      prisma.projectMember.deleteMany({ where: { projectId: parsed.data.id } }),
+      prisma.projectMember.createMany({
+        data: members.ids.map((employeeId) => ({ projectId: parsed.data.id, employeeId })),
+      }),
+    ]);
+
+    refreshWork();
     return { success: true, message: "Project updated." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to update project" };
@@ -71,7 +111,7 @@ export async function deleteProject(id: string): Promise<ActionResult> {
       prisma.projectMember.deleteMany({ where: { projectId: id } }),
       prisma.project.delete({ where: { id } }),
     ]);
-    revalidatePath("/tasks");
+    refreshWork();
     return { success: true, message: "Project deleted." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to delete project." };
@@ -87,15 +127,25 @@ export async function createTask(input: unknown): Promise<ActionResult & { taskI
     }
     const data = parsed.data;
 
-    const assignee = await prisma.employee.findUnique({
-      where: { id: data.assigneeId },
+    const assigneeIds = Array.from(new Set(data.assigneeIds));
+    const assignees = await prisma.employee.findMany({
+      where: { id: { in: assigneeIds } },
       include: { user: { select: { id: true } } },
     });
-    if (!assignee) return { success: false, error: "Assignee not found." };
+    if (assignees.length !== assigneeIds.length) return { success: false, error: "Assignee not found." };
 
     if (data.projectId) {
-      const project = await prisma.project.findUnique({ where: { id: data.projectId } });
+      const project = await prisma.project.findUnique({
+        where: { id: data.projectId },
+        include: { members: { select: { employeeId: true } } },
+      });
       if (!project) return { success: false, error: "Project not found." };
+      if (project.members.length > 0) {
+        const allowed = new Set(project.members.map((member) => member.employeeId));
+        if (assigneeIds.some((id) => !allowed.has(id))) {
+          return { success: false, error: "Share the project with every assignee first." };
+        }
+      }
     }
 
     const task = await prisma.task.create({
@@ -103,27 +153,35 @@ export async function createTask(input: unknown): Promise<ActionResult & { taskI
         title: data.title,
         description: data.description,
         projectId: data.projectId || null,
-        assigneeId: data.assigneeId,
+        assigneeId: assigneeIds[0],
+        assignments: { create: assigneeIds.map((employeeId) => ({ employeeId })) },
         createdById: session.user.employeeId!,
         priority: data.priority,
         status: data.status,
+        kind: data.kind,
         dueDate: data.dueDate ?? null,
         estimatedHours: data.estimatedHours ?? null,
       },
     });
 
-    if (assignee.user && assignee.user.id !== session.user.id) {
-      await notifyUserNewTask({
-        userId: assignee.user.id,
-        taskId: task.id,
-        taskTitle: task.title,
-        dueDate: task.dueDate,
-      });
+    for (const assignee of assignees) {
+      if (assignee.user && assignee.user.id !== session.user.id) {
+        await notifyUserNewTask({
+          userId: assignee.user.id,
+          taskId: task.id,
+          taskTitle: task.title,
+          dueDate: task.dueDate,
+        });
+      }
     }
 
-    revalidatePath("/tasks");
-    revalidatePath("/dashboard");
-    return { success: true, taskId: task.id, message: `Task assigned to ${assignee.firstName}.` };
+    refreshWork();
+    const names = assignees.map((person) => person.firstName).join(", ");
+    return {
+      success: true,
+      taskId: task.id,
+      message: data.kind === "MEETING" ? `Meeting shared with ${names}.` : `Task assigned to ${names}.`,
+    };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to create task" };
   }
@@ -145,7 +203,7 @@ export async function updateTaskStatus(input: unknown): Promise<ActionResult> {
       data: { status: parsed.data.status },
     });
 
-    revalidatePath("/tasks");
+    refreshWork();
     return { success: true, message: "Task status updated." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to update task" };
@@ -165,8 +223,18 @@ export async function createSubtask(input: {
     const title = input.title.trim();
     if (!title) return { success: false, error: "Enter a subtask title." };
 
-    const parent = await prisma.task.findUnique({ where: { id: input.parentId } });
+    const parent = await prisma.task.findUnique({
+      where: { id: input.parentId },
+      include: { assignments: { select: { employeeId: true } } },
+    });
     if (!parent || parent.parentId) return { success: false, error: "Choose a main task." };
+
+    const assigneeIds = Array.from(
+      new Set([
+        ...parent.assignments.map((assignment) => assignment.employeeId),
+        ...(parent.assigneeId ? [parent.assigneeId] : []),
+      ]),
+    );
 
     const hours = input.estimatedHours;
     await prisma.task.create({
@@ -176,15 +244,17 @@ export async function createSubtask(input: {
         parentId: parent.id,
         projectId: parent.projectId,
         assigneeId: parent.assigneeId,
+        assignments: assigneeIds.length > 0 ? { create: assigneeIds.map((employeeId) => ({ employeeId })) } : undefined,
         createdById: session.user.employeeId!,
         priority: input.priority ?? parent.priority,
         status: "TODO",
+        kind: parent.kind,
         dueDate: input.dueDate ?? null,
         estimatedHours: hours == null || Number.isNaN(hours) ? null : hours,
       },
     });
 
-    revalidatePath("/tasks");
+    refreshWork();
     return { success: true, message: "Subtask added." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to add subtask" };
@@ -195,7 +265,7 @@ export async function deleteTask(id: string): Promise<ActionResult> {
   try {
     await requireEmployee();
     await prisma.task.delete({ where: { id } });
-    revalidatePath("/tasks");
+    refreshWork();
     return { success: true, message: "Task deleted." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to delete task" };

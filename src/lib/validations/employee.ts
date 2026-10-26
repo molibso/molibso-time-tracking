@@ -40,6 +40,19 @@ export const employeeUpdateSchema = employeeBaseSchema.partial().extend({
 });
 export type EmployeeUpdateInput = z.infer<typeof employeeUpdateSchema>;
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(8, "Confirm your new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "New passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
 export const employeeProfileSchema = z.object({
   phone: z
     .string()

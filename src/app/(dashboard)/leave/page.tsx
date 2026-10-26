@@ -93,26 +93,26 @@ export default async function LeavePage({
       </div>
 
       {canApprove ? (
-        <Tabs defaultValue="person">
+        <Tabs defaultValue="approvals">
           <TabsList>
-            <TabsTrigger value="person">
-              {view.isSelf ? translate(locale, "leave.myRequests") : translate(locale, "leave.theirRequests", { name: view.viewedName })}
-            </TabsTrigger>
             <TabsTrigger value="approvals">
               {translate(locale, "leave.approvals")} {pendingRows.length > 0 && `(${pendingRows.length})`}
             </TabsTrigger>
+            <TabsTrigger value="person">
+              {view.isSelf ? translate(locale, "leave.myRequests") : translate(locale, "leave.theirRequests", { name: view.viewedName })}
+            </TabsTrigger>
           </TabsList>
-          <TabsContent value="person">
-            <Card>
-              <CardContent className="pt-5">
-                <MyLeaveTable rows={personRows} readOnly={!view.isSelf} />
-              </CardContent>
-            </Card>
-          </TabsContent>
           <TabsContent value="approvals">
             <Card>
               <CardContent className="pt-5">
                 <LeaveApprovals rows={pendingRows} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="person">
+            <Card>
+              <CardContent className="pt-5">
+                <MyLeaveTable rows={personRows} readOnly={!view.isSelf} />
               </CardContent>
             </Card>
           </TabsContent>

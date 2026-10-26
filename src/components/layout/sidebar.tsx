@@ -21,7 +21,7 @@ export function Sidebar({ role }: { role: Role }) {
         </span>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3 py-1">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-1">
         {items.map((item) => {
           const active = isNavActive(item.href, pathname);
           return (

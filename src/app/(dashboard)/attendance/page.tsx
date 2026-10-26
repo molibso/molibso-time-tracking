@@ -11,6 +11,7 @@ import { RoleBadge } from "@/components/layout/role-badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { formatDate, formatDuration } from "@/lib/utils";
+import { FULL_DAY_SECONDS, balanceSeconds, formatBalance } from "@/lib/day-balance";
 import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { translate } from "@/lib/i18n/messages";
@@ -127,7 +128,7 @@ export default async function AttendancePage({
                   <TableHead>{translate(locale, "attendance.status")}</TableHead>
                   <TableHead>{translate(locale, "attendance.worked")}</TableHead>
                   <TableHead>{translate(locale, "attendance.break")}</TableHead>
-                  <TableHead>{translate(locale, "attendance.overtime")}</TableHead>
+                  <TableHead>{translate(locale, "attendance.balance")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -140,8 +141,8 @@ export default async function AttendancePage({
                     <TableCell className="text-sm text-muted-foreground">{a.status}</TableCell>
                     <TableCell className="font-medium">{formatDuration(workedSeconds)}</TableCell>
                     <TableCell>{formatDuration(breakSeconds)}</TableCell>
-                    <TableCell>
-                      {a.overtimeMinutes > 0 ? formatDuration(a.overtimeMinutes * 60) : "—"}
+                    <TableCell className={workedSeconds >= FULL_DAY_SECONDS ? "font-medium text-success" : "font-medium text-danger"}>
+                      {workedSeconds > 0 ? formatBalance(balanceSeconds(workedSeconds)) : "—"}
                     </TableCell>
                   </TableRow>
                   );

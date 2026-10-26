@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -22,13 +22,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useLocale } from "@/components/layout/locale-provider";
+import { PeoplePicker } from "@/components/tasks/people-picker";
+import type { TaskFormOption } from "@/components/tasks/task-form-dialog";
 
 export function ProjectFormDialog({
   project,
+  employees = [],
+  selfId,
   trigger,
   onDeleted,
 }: {
-  project?: { id: string; name: string; description: string | null };
+  project?: { id: string; name: string; description: string | null; memberIds?: string[] };
+  employees?: TaskFormOption[];
+  selfId?: string;
   trigger?: React.ReactNode;
   onDeleted?: (id: string) => void;
 }) {
@@ -43,12 +49,14 @@ export function ProjectFormDialog({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<ProjectInput>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       name: project?.name ?? "",
       description: project?.description ?? "",
+      memberIds: project?.memberIds ?? (selfId ? [selfId] : []),
     },
   });
 
@@ -57,10 +65,11 @@ export function ProjectFormDialog({
       reset({
         name: project?.name ?? "",
         description: project?.description ?? "",
+        memberIds: project?.memberIds ?? (selfId ? [selfId] : []),
       });
       setConfirmOpen(false);
     }
-  }, [open, project, reset]);
+  }, [open, project, reset, selfId]);
 
   async function onSubmit(data: ProjectInput) {
     startTransition(async () => {
@@ -121,6 +130,22 @@ export function ProjectFormDialog({
               <Label htmlFor={`project-description-${project?.id ?? "new"}`}>{t("tasks.field.description")}</Label>
               <Textarea id={`project-description-${project?.id ?? "new"}`} rows={3} {...register("description")} />
             </div>
+            <div className="space-y-1.5">
+              <Label>{t("tasks.shareWith")}</Label>
+              <p className="text-sm text-muted-foreground">{t("tasks.shareHint")}</p>
+              <Controller
+                control={control}
+                name="memberIds"
+                render={({ field }) => (
+                  <PeoplePicker
+                    people={employees}
+                    value={field.value ?? []}
+                    lockedIds={selfId ? [selfId] : []}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
             <DialogFooter className="flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
               {isEdit ? (
                 <Button
@@ -176,15 +201,21 @@ export function ProjectFormDialog({
 
 export function ProjectEditButton({
   project,
+  employees,
+  selfId,
   onDeleted,
 }: {
-  project: { id: string; name: string; description: string | null };
+  project: { id: string; name: string; description: string | null; memberIds?: string[] };
+  employees: TaskFormOption[];
+  selfId?: string;
   onDeleted?: (id: string) => void;
 }) {
   const { t } = useLocale();
   return (
     <ProjectFormDialog
       project={project}
+      employees={employees}
+      selfId={selfId}
       onDeleted={onDeleted}
       trigger={
         <Button
