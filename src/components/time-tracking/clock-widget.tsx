@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { clockIn, clockOut, startBreak, endBreak } from "@/actions/time-tracking";
 import type { ClockStatus } from "@/types/clock";
 import { cn } from "@/lib/utils";
+import { BREAK_ALLOWANCE_SECONDS, FULL_DAY_SECONDS } from "@/lib/day-balance";
 import { useClockSession, type ClockSessionState } from "./clock-session";
 import { useLocale } from "@/components/layout/locale-provider";
-import { intlLocale, type MessageKey } from "@/lib/i18n/messages";
+import { intlLocale, type Locale, type MessageKey } from "@/lib/i18n/messages";
 
 const STATUS_CONFIG: Record<ClockStatus, { labelKey: MessageKey; dot: string; text: string }> = {
   WORKING: { labelKey: "clock.working", dot: "bg-success", text: "text-success" },
@@ -26,13 +27,33 @@ function formatElapsed(startIso: string) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function formatHoursLeft(totalSeconds: number) {
+  const abs = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(abs / 3600);
+  const minutes = Math.floor((abs % 3600) / 60);
+  if (abs > 0 && hours === 0 && minutes === 0) return "1m";
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  return `${minutes}m`;
+}
+
+function todayStartMs(now: number) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  return start.getTime();
+}
+
 export function ClockWidget({
   readOnly = false,
   personLabel,
+  closedSecondsToday = 0,
+  closedBreakSecondsToday = 0,
 }: {
   /** When true, show status only (boss viewing a teammate). */
   readOnly?: boolean;
   personLabel?: string;
+  /** Finished shifts today. The open shift is added live. */
+  closedSecondsToday?: number;
+  closedBreakSecondsToday?: number;
 }) {
   const router = useRouter();
   const { t, locale } = useLocale();
@@ -42,6 +63,7 @@ export function ClockWidget({
   const revision = useRef(0);
   const queue = useRef(Promise.resolve());
   const [elapsed, setElapsed] = useState("00:00:00");
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const { status, clockInTime, breakSince } = session;
   const config = STATUS_CONFIG[status];
@@ -52,7 +74,10 @@ export function ClockWidget({
       setElapsed("00:00:00");
       return;
     }
-    const tick = () => setElapsed(formatElapsed(reference));
+    const tick = () => {
+      setElapsed(formatElapsed(reference));
+      setNowMs(Date.now());
+    };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -133,6 +158,17 @@ export function ClockWidget({
               })}
             </p>
           )}
+          {clockInTime && status !== "OFFLINE" && (
+            <DayRemainder
+              nowMs={nowMs}
+              clockInTime={clockInTime}
+              breakSince={breakSince}
+              completedBreakSecondsOnOpen={session.completedBreakSecondsOnOpen}
+              closedSecondsToday={closedSecondsToday}
+              closedBreakSecondsToday={closedBreakSecondsToday}
+              locale={locale}
+            />
+          )}
           {readOnly && (
             <p className="mt-2 text-xs text-muted-foreground">{t("clock.readOnly")}</p>
           )}
@@ -170,4 +206,53 @@ export function ClockWidget({
       </div>
     </div>
   );
+}
+
+function DayRemainder({
+  nowMs,
+  clockInTime,
+  breakSince,
+  completedBreakSecondsOnOpen,
+  closedSecondsToday,
+  closedBreakSecondsToday,
+  locale,
+}: {
+  nowMs: number;
+  clockInTime: string;
+  breakSince: string | null;
+  completedBreakSecondsOnOpen: number;
+  closedSecondsToday: number;
+  closedBreakSecondsToday: number;
+  locale: Locale;
+}) {
+  const { t } = useLocale();
+  const clockInMs = new Date(clockInTime).getTime();
+  const dayStart = todayStartMs(nowMs);
+  const from = Math.max(clockInMs, dayStart);
+  let openWorked = Math.max(0, Math.floor((nowMs - from) / 1000));
+  let openBreak = 0;
+  if (clockInMs >= dayStart) {
+    openBreak += completedBreakSecondsOnOpen;
+    openWorked = Math.max(0, openWorked - completedBreakSecondsOnOpen);
+  }
+  if (breakSince) {
+    const breakMs = Math.max(0, nowMs - new Date(breakSince).getTime());
+    const breakSeconds = Math.floor(breakMs / 1000);
+    openBreak += breakSeconds;
+    openWorked = Math.max(0, openWorked - breakSeconds);
+  }
+
+  const worked = closedSecondsToday + openWorked;
+  const breaks = closedBreakSecondsToday + openBreak;
+  const remainingWork = Math.max(0, FULL_DAY_SECONDS - worked);
+  const remainingBreak = Math.max(0, BREAK_ALLOWANCE_SECONDS - breaks);
+  const until = new Date(nowMs + (remainingWork + remainingBreak) * 1000);
+  const untilLabel = until.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" });
+
+  let text: string;
+  if (remainingWork === 0 && remainingBreak === 0) text = t("clock.dayComplete");
+  else if (remainingWork === 0) text = t("clock.workDoneUntil", { until: untilLabel });
+  else text = t("clock.left", { time: formatHoursLeft(remainingWork), until: untilLabel });
+
+  return <p className="mt-1 text-sm font-medium tabular-nums text-foreground">{text}</p>;
 }

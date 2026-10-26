@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getClockStatus, getTodayWorkedBreakdown, getVacationBalance } from "@/lib/queries/dashboard";
+import { getClockStatus, getExpectedWorkTargets, getTodayWorkedBreakdown, getVacationBalance } from "@/lib/queries/dashboard";
 import { resolveShiftRange } from "@/lib/shift-period";
 import { resolveTeamView } from "@/lib/team-view";
 import { ClockWidget } from "@/components/time-tracking/clock-widget";
@@ -39,7 +39,7 @@ export default async function TimeTrackingPage({
 
   const employeeId = view.viewedEmployeeId;
 
-  const [clockStatus, attendances, worked, vacation] = await Promise.all([
+  const [clockStatus, attendances, worked, vacation, targets] = await Promise.all([
     getClockStatus(employeeId),
     prisma.attendance.findMany({
       where: { employeeId, date: { gte: range.from, lte: range.to } },
@@ -48,6 +48,7 @@ export default async function TimeTrackingPage({
     }),
     getTodayWorkedBreakdown(employeeId),
     getVacationBalance(employeeId),
+    getExpectedWorkTargets(employeeId),
   ]);
 
   const rangeBalance = attendances.reduce((sum, day) => {
@@ -83,13 +84,21 @@ export default async function TimeTrackingPage({
           completedBreakSecondsOnOpen: worked.completedBreakSecondsOnOpen,
         }}
       >
-        <ClockWidget readOnly={!view.isSelf} personLabel={view.isSelf ? undefined : view.viewedName} />
+        <ClockWidget
+          readOnly={!view.isSelf}
+          personLabel={view.isSelf ? undefined : view.viewedName}
+          closedSecondsToday={worked.closedSecondsToday}
+          closedBreakSecondsToday={worked.closedBreakSecondsToday}
+        />
 
         <WorkedHoursKpis
           closedSecondsToday={worked.closedSecondsToday}
           closedSecondsWeek={worked.closedSecondsWeek}
           closedSecondsMonth={worked.closedSecondsMonth}
           vacation={vacation}
+          targetToday={targets.today}
+          targetWeek={targets.week}
+          targetMonth={targets.month}
         />
       </ClockSessionProvider>
 

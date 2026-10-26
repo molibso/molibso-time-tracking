@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
       upcomingLeave: leave.map((l) => ({
         id: l.id,
         type: l.type,
+        status: l.status,
         startDate: l.startDate,
         endDate: l.endDate,
         totalDays: l.totalDays,

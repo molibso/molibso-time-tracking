@@ -10,12 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { reviewLeaveRequest } from "@/actions/leave";
 import { formatDateRange } from "@/lib/utils";
-import { leaveKindKey } from "@/lib/i18n/labels";
+import { leaveKindKey, leavePartKey } from "@/lib/i18n/labels";
 
 export interface PendingLeaveRow {
   id: string;
   employeeName: string;
   type: string;
+  dayPart?: string | null;
   startDate: Date;
   endDate: Date;
   totalDays: number;
@@ -59,10 +60,14 @@ export function LeaveApprovals({ rows }: { rows: PendingLeaveRow[] }) {
       <TableBody>
         {rows.map((r) => {
           const kind = leaveKindKey(r.type);
+          const part = leavePartKey(r.dayPart);
           return (
             <TableRow key={r.id}>
               <TableCell className="font-medium">{r.employeeName}</TableCell>
-              <TableCell>{kind ? t(kind) : r.type}</TableCell>
+              <TableCell>
+                {kind ? t(kind) : r.type}
+                {part ? ` · ${t(part)}` : ""}
+              </TableCell>
               <TableCell className="tabular-nums">{formatDateRange(r.startDate, r.endDate, locale)}</TableCell>
               <TableCell className="tabular-nums">
                 {r.totalDays === 1 ? t("leave.dayCount", { count: r.totalDays }) : t("leave.dayCountPlural", { count: r.totalDays })}

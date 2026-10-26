@@ -1,5 +1,6 @@
-/** A full day is 8 hours. More is overtime, less is time still owed. */
+/** A full day is 8 hours of work, plus a 40 minute break in the finish time. */
 export const FULL_DAY_SECONDS = 8 * 60 * 60;
+export const BREAK_ALLOWANCE_SECONDS = 40 * 60;
 
 export function balanceSeconds(workedSeconds: number): number {
   return Math.floor(workedSeconds) - FULL_DAY_SECONDS;

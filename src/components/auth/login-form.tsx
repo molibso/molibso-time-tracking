@@ -12,9 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useLocale } from "@/components/layout/locale-provider";
-import { DEV_ACCOUNTS } from "@/lib/dev-login";
 
-export function LoginForm({ showDevLogin = false }: { showDevLogin?: boolean }) {
+export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLocale();
@@ -27,20 +26,6 @@ export function LoginForm({ showDevLogin = false }: { showDevLogin?: boolean }) 
     formState: { errors },
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
-  async function finishSignIn(result: { error?: string } | undefined, devShortcut: boolean) {
-    setIsSubmitting(false);
-    if (result?.error) {
-      setServerError(
-        devShortcut
-          ? "Dummy sign-in failed. Start the local database and apply migrations, then try again."
-          : t("login.error"),
-      );
-      return;
-    }
-    router.push(searchParams.get("callbackUrl") ?? "/dashboard");
-    router.refresh();
-  }
-
   async function onSubmit(data: LoginInput) {
     setServerError(null);
     setIsSubmitting(true);
@@ -49,19 +34,13 @@ export function LoginForm({ showDevLogin = false }: { showDevLogin?: boolean }) 
       password: data.password,
       redirect: false,
     });
-    await finishSignIn(result ?? undefined, false);
-  }
-
-  async function signInAsDummy(email: string) {
-    setServerError(null);
-    setIsSubmitting(true);
-    const result = await signIn("credentials", {
-      email,
-      password: "local-dev",
-      devShortcut: "1",
-      redirect: false,
-    });
-    await finishSignIn(result ?? undefined, true);
+    setIsSubmitting(false);
+    if (result?.error) {
+      setServerError(t("login.error"));
+      return;
+    }
+    router.push(searchParams.get("callbackUrl") ?? "/dashboard");
+    router.refresh();
   }
 
   return (
@@ -114,32 +93,6 @@ export function LoginForm({ showDevLogin = false }: { showDevLogin?: boolean }) 
         {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
         {isSubmitting ? t("login.submitting") : t("login.signIn")}
       </Button>
-
-      {showDevLogin && (
-        <div className="space-y-3 border-t border-border pt-5">
-          <div>
-            <p className="text-sm font-medium">Local development</p>
-            <p className="text-sm text-muted-foreground">Open the app with dummy data. This block is not shown in production.</p>
-          </div>
-          <div className="grid gap-2">
-            {DEV_ACCOUNTS.map((account) => (
-              <Button
-                key={account.email}
-                type="button"
-                variant="outline"
-                className="h-auto w-full justify-start whitespace-normal px-3 py-2.5"
-                disabled={isSubmitting}
-                onClick={() => signInAsDummy(account.email)}
-              >
-                <span className="text-left">
-                  <span className="block font-medium">Continue as {account.label}</span>
-                  <span className="block text-xs font-normal text-muted-foreground">{account.hint}</span>
-                </span>
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
     </form>
   );
 }

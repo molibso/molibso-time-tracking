@@ -69,14 +69,14 @@ export async function reserveRoom(input: {
     if (!employeeId) return { success: false, error: "No employee profile linked to this account." };
 
     const title = input.title.trim();
-    if (!title) return { success: false, error: "Enter what the room is for." };
+    if (!title) return { success: false, error: "Enter what the booking is for." };
     const startTime = combineDateAndTime(input.date, input.start);
     const endTime = combineDateAndTime(input.date, input.end);
     if (!startTime || !endTime) return { success: false, error: "Enter a valid date and time." };
     if (endTime <= startTime) return { success: false, error: "End time has to be after the start." };
 
     const room = await prisma.meetingRoom.findUnique({ where: { id: input.roomId } });
-    if (!room) return { success: false, error: "Room not found." };
+    if (!room) return { success: false, error: "That resource was not found." };
 
     if (input.projectId) {
       const project = await prisma.project.findUnique({ where: { id: input.projectId } });
@@ -90,7 +90,7 @@ export async function reserveRoom(input: {
         endTime: { gt: startTime },
       },
     });
-    if (conflict) return { success: false, error: "That room is already reserved then." };
+    if (conflict) return { success: false, error: "That slot is already booked." };
 
     await prisma.roomReservation.create({
       data: {
@@ -105,7 +105,7 @@ export async function reserveRoom(input: {
     });
 
     revalidatePath("/rooms");
-    return { success: true, message: "Room reserved." };
+    return { success: true, message: "Booked." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to reserve room" };
   }

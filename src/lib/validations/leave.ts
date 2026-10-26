@@ -4,11 +4,12 @@ import { LeaveType, LeaveStatus, CorrectionStatus } from "@prisma/client";
 export const leaveRequestSchema = z
   .object({
     type: z.nativeEnum(LeaveType),
+    dayPart: z.enum(["FULL", "MORNING", "AFTERNOON"]).default("FULL"),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
     reason: z.string().max(500).optional(),
   })
-  .refine((data) => data.endDate >= data.startDate, {
+  .refine((data) => data.dayPart !== "FULL" || data.endDate >= data.startDate, {
     message: "End date must be on or after start date",
     path: ["endDate"],
   });

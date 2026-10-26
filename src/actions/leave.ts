@@ -6,18 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
 import { recalculateAttendanceTotals } from "@/lib/attendance";
 import { leaveRequestSchema, leaveReviewSchema, correctionReviewSchema } from "@/lib/validations/leave";
+import { resolveLeaveLength } from "@/lib/leave-days";
 import type { ActionResult } from "./auth";
-
-function businessDaysBetween(start: Date, end: Date): number {
-  let count = 0;
-  const cur = new Date(start);
-  while (cur <= end) {
-    const day = cur.getDay();
-    if (day !== 0 && day !== 6) count++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return count;
-}
 
 export async function createLeaveRequest(input: unknown): Promise<ActionResult> {
   try {
@@ -28,10 +18,11 @@ export async function createLeaveRequest(input: unknown): Promise<ActionResult> 
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
     }
-    const { type, startDate, endDate, reason } = parsed.data;
-
-    const totalDays =
-      type === "HALF_DAY" ? 0.5 : businessDaysBetween(startDate, endDate);
+    const { type, startDate, reason } = parsed.data;
+    const length = resolveLeaveLength(type, parsed.data.dayPart, startDate, parsed.data.endDate);
+    if (length.error) return { success: false, error: length.error };
+    const { totalDays, endDate } = length;
+    const dayPart = type === "VACATION" ? parsed.data.dayPart : "FULL";
 
     if (type === "VACATION") {
       const employee = await prisma.employee.findUnique({ where: { id: session.user.employeeId } });
@@ -51,6 +42,7 @@ export async function createLeaveRequest(input: unknown): Promise<ActionResult> 
       data: {
         employeeId: session.user.employeeId,
         type,
+        dayPart,
         startDate,
         endDate,
         totalDays,
@@ -60,6 +52,7 @@ export async function createLeaveRequest(input: unknown): Promise<ActionResult> 
 
     revalidatePath("/leave");
     revalidatePath("/dashboard");
+    revalidatePath("/time-tracking");
     return { success: true, message: "Leave request submitted." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to submit leave request" };
@@ -100,6 +93,8 @@ export async function reviewLeaveRequest(input: unknown): Promise<ActionResult> 
     });
 
     revalidatePath("/leave");
+    revalidatePath("/dashboard");
+    revalidatePath("/time-tracking");
     return { success: true, message: `Leave request ${leave.status.toLowerCase()}.` };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to review leave request" };

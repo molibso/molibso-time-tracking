@@ -46,5 +46,11 @@ export function taskPriorityKey(priority: string): MessageKey | null {
 }
 
 export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"] as const;
-export const LEAVE_KINDS = ["VACATION", "SICK", "PERSONAL", "HALF_DAY", "WORK_FROM_HOME"] as const;
+export const LEAVE_KINDS = ["VACATION", "SICK", "PERSONAL", "WORK_FROM_HOME"] as const;
+
+export function leavePartKey(dayPart: string | null | undefined): MessageKey | null {
+  if (dayPart === "MORNING") return "leave.part.morning";
+  if (dayPart === "AFTERNOON") return "leave.part.afternoon";
+  return null;
+}
 export const TASK_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;

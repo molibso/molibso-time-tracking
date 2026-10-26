@@ -39,17 +39,19 @@ function dateInput(date: Date) {
 }
 
 export function RoomsBoard({
-  roomId,
-  reservations,
+  resources,
 }: {
-  roomId: string;
-  reservations: ReservationRow[];
+  resources: { id: string; kind: "room" | "car"; reservations: ReservationRow[] }[];
 }) {
   const router = useRouter();
   const { t, locale } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [bookDate, setBookDate] = useState(() => dateInput(new Date()));
+  const [selectedId, setSelectedId] = useState(resources[0]?.id ?? "");
+  const selected = resources.find((resource) => resource.id === selectedId) ?? resources[0];
+  const reservations = selected?.reservations ?? [];
+  const roomId = selected?.id ?? "";
   const tag = intlLocale(locale);
   const now = new Date();
 
@@ -114,6 +116,22 @@ export function RoomsBoard({
 
   return (
     <div className="space-y-4">
+      <div className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
+        {resources.map((resource) => (
+          <button
+            key={resource.id}
+            type="button"
+            onClick={() => setSelectedId(resource.id)}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              resource.id === selected?.id ? "bg-surface text-foreground shadow-soft" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t(resource.kind === "car" ? "rooms.car" : "rooms.conference")}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
         <p className={cn("text-sm font-medium", current ? "text-warning" : "text-success")}>
           {current
@@ -192,7 +210,7 @@ export function RoomsBoard({
 
       <form onSubmit={book} className="grid gap-3 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_auto_auto_auto_auto] lg:items-end">
         <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-          <Label htmlFor="purpose">{t("rooms.bookSlot")}</Label>
+          <Label htmlFor="purpose">{t(selected?.kind === "car" ? "rooms.bookCar" : "rooms.bookRoom")}</Label>
           <Input id="purpose" name="title" required placeholder={t("rooms.purpose")} />
         </div>
         <div className="space-y-1.5">

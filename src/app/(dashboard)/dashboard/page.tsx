@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
 import { auth } from "@/lib/auth";
@@ -10,8 +11,9 @@ import { getVisibleEmployeeIds, leaveEmployeeIdsWhere } from "@/lib/role-scope";
 import {
   getClockStatus,
   getTodayWorkedBreakdown,
-  getWeeklyChartData,
+  getWorkedChart,
   getVacationBalance,
+  getExpectedWorkTargets,
   getTeamAvailability,
   getUpcomingLeave,
 } from "@/lib/queries/dashboard";
@@ -19,6 +21,8 @@ import { ClockWidget } from "@/components/time-tracking/clock-widget";
 import { ClockSessionProvider } from "@/components/time-tracking/clock-session";
 import { WorkedHoursKpis } from "@/components/dashboard/worked-hours-kpis";
 import { WeeklyHoursChart } from "@/components/charts/weekly-hours-chart";
+import { HoursChartControls } from "@/components/dashboard/hours-chart-controls";
+import { resolveChartRange } from "@/lib/chart-range";
 import { TeamAvailability } from "@/components/dashboard/team-availability";
 import { UpcomingLeave } from "@/components/dashboard/upcoming-leave";
 import { ForbiddenBanner } from "@/components/dashboard/forbidden-banner";
@@ -33,12 +37,13 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; chart?: string; from?: string; to?: string }>;
 }) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const { error } = await searchParams;
+  const { error, chart, from, to } = await searchParams;
+  const chartRange = resolveChartRange({ chart, from, to });
   const role = session.user.role ?? Role.EMPLOYEE;
   const roleView = getRoleView(role);
   const locale = await getLocale();
@@ -64,6 +69,7 @@ export default async function DashboardPage({
     worked,
     chartData,
     vacation,
+    targets,
     teamAvailability,
     upcomingLeaveRaw,
     employee,
@@ -73,8 +79,9 @@ export default async function DashboardPage({
   ] = await Promise.all([
     getClockStatus(employeeId),
     getTodayWorkedBreakdown(employeeId),
-    getWeeklyChartData(employeeId),
+    getWorkedChart(employeeId, chartRange.from, chartRange.to, locale),
     getVacationBalance(employeeId),
+    getExpectedWorkTargets(employeeId),
     canViewTeam ? getTeamAvailability({ all: true }) : Promise.resolve([]),
     getUpcomingLeave(canViewTeam ? { teamWide: true } : { employeeId }),
     prisma.employee.findUnique({ where: { id: employeeId } }),
@@ -95,6 +102,8 @@ export default async function DashboardPage({
     id: l.id,
     employeeName: `${l.employee.firstName} ${l.employee.lastName}`,
     type: l.type,
+    dayPart: l.dayPart,
+    status: l.status,
     startDate: l.startDate,
     endDate: l.endDate,
     totalDays: l.totalDays,
@@ -133,20 +142,29 @@ export default async function DashboardPage({
           completedBreakSecondsOnOpen: worked.completedBreakSecondsOnOpen,
         }}
       >
-        <ClockWidget />
+        <ClockWidget
+          closedSecondsToday={worked.closedSecondsToday}
+          closedBreakSecondsToday={worked.closedBreakSecondsToday}
+        />
 
         <WorkedHoursKpis
           closedSecondsToday={worked.closedSecondsToday}
           closedSecondsWeek={worked.closedSecondsWeek}
           closedSecondsMonth={worked.closedSecondsMonth}
           vacation={vacation}
+          targetToday={targets.today}
+          targetWeek={targets.week}
+          targetMonth={targets.month}
         />
       </ClockSessionProvider>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader>
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
             <CardTitle>{translate(locale, "dashboard.hoursChart")}</CardTitle>
+            <Suspense>
+              <HoursChartControls span={chartRange.span} from={chartRange.customFrom} to={chartRange.customTo} />
+            </Suspense>
           </CardHeader>
           <CardContent>
             <WeeklyHoursChart data={chartData} />

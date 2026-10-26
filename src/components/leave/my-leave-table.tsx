@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { cancelLeaveRequest } from "@/actions/leave";
 import { formatDateRange } from "@/lib/utils";
 import { useLocale } from "@/components/layout/locale-provider";
-import { leaveKindKey, leaveStatusKey } from "@/lib/i18n/labels";
+import { leaveKindKey, leavePartKey, leaveStatusKey } from "@/lib/i18n/labels";
 
 export interface MyLeaveRow {
   id: string;
   type: string;
+  dayPart?: string | null;
   startDate: Date;
   endDate: Date;
   totalDays: number;
@@ -69,10 +70,14 @@ export function MyLeaveTable({ rows, readOnly = false }: { rows: MyLeaveRow[]; r
       <TableBody>
         {rows.map((r) => {
           const kind = leaveKindKey(r.type);
+          const part = leavePartKey(r.dayPart);
           const status = leaveStatusKey(r.status);
           return (
             <TableRow key={r.id}>
-              <TableCell>{kind ? t(kind) : r.type}</TableCell>
+              <TableCell>
+                {kind ? t(kind) : r.type}
+                {part ? ` · ${t(part)}` : ""}
+              </TableCell>
               <TableCell className="tabular-nums">{formatDateRange(r.startDate, r.endDate, locale)}</TableCell>
               <TableCell className="tabular-nums">
                 {r.totalDays === 1 ? t("leave.dayCount", { count: r.totalDays }) : t("leave.dayCountPlural", { count: r.totalDays })}

@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
       static: 300,
     },
     serverActions: {
-      bodySizeLimit: "2mb",
+      bodySizeLimit: "8mb",
     },
   },
   images: {

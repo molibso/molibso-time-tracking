@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireApiEmployee, requireApiPermission } from "@/lib/api/auth";
-import { businessDaysBetween } from "@/lib/api/services";
+import { resolveLeaveLength } from "@/lib/leave-days";
 import { created, fail, notFound, ok, serverError } from "@/lib/api/response";
 import { leaveRequestSchema, leaveReviewSchema } from "@/lib/validations/leave";
 import { hasPermission } from "@/lib/rbac";
@@ -57,8 +57,11 @@ export async function POST(req: NextRequest) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid input", 400, parsed.error.flatten());
     }
 
-    const { type, startDate, endDate, reason } = parsed.data;
-    const totalDays = type === "HALF_DAY" ? 0.5 : businessDaysBetween(startDate, endDate);
+    const { type, startDate, reason } = parsed.data;
+    const length = resolveLeaveLength(type, parsed.data.dayPart, startDate, parsed.data.endDate);
+    if (length.error) return fail(length.error);
+    const { totalDays, endDate } = length;
+    const dayPart = type === "VACATION" ? parsed.data.dayPart : "FULL";
 
     if (type === "VACATION") {
       const employee = await prisma.employee.findUnique({ where: { id: user.employeeId } });
@@ -78,6 +81,7 @@ export async function POST(req: NextRequest) {
       data: {
         employeeId: user.employeeId,
         type,
+        dayPart,
         startDate,
         endDate,
         totalDays,

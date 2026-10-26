@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarCheck2, Clock3, PlaneTakeoff, TrendingUp } from "lucide-react";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { useClockSession } from "@/components/time-tracking/clock-session";
-import { formatDuration } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
+import { formatWorkTarget } from "@/lib/expected-hours";
 import { useLocale } from "@/components/layout/locale-provider";
 
 /** Open-session worked seconds (breaks excluded), computed live. */
@@ -33,11 +34,17 @@ export function WorkedHoursKpis({
   closedSecondsWeek,
   closedSecondsMonth,
   vacation,
+  targetToday,
+  targetWeek,
+  targetMonth,
 }: {
   closedSecondsToday: number;
   closedSecondsWeek: number;
   closedSecondsMonth: number;
   vacation: { remaining: number; used: number; allowance: number };
+  targetToday: number;
+  targetWeek: number;
+  targetMonth: number;
 }) {
   const clock = useClockSession();
   const { t } = useLocale();
@@ -80,11 +87,15 @@ export function WorkedHoursKpis({
   const weekSeconds = closedSecondsWeek + shown;
   const monthSeconds = closedSecondsMonth + shown;
 
+  const today = workedAgainst(todaySeconds, targetToday);
+  const week = workedAgainst(weekSeconds, targetWeek);
+  const month = workedAgainst(monthSeconds, targetMonth);
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <KpiCard label={t("kpi.today")} value={formatDuration(todaySeconds)} icon={Clock3} accent="primary" />
-      <KpiCard label={t("kpi.week")} value={formatDuration(weekSeconds)} icon={TrendingUp} accent="success" />
-      <KpiCard label={t("kpi.month")} value={formatDuration(monthSeconds)} icon={CalendarCheck2} accent="primary" />
+      <KpiCard label={t("kpi.today")} value={today.value} icon={Clock3} accent="primary" valueClassName={today.className} />
+      <KpiCard label={t("kpi.week")} value={week.value} icon={TrendingUp} accent="success" valueClassName={week.className} />
+      <KpiCard label={t("kpi.month")} value={month.value} icon={CalendarCheck2} accent="primary" valueClassName={month.className} />
       <KpiCard
         label={t("kpi.vacation")}
         value={`${vacation.remaining}d`}
@@ -94,4 +105,12 @@ export function WorkedHoursKpis({
       />
     </div>
   );
+}
+
+function workedAgainst(workedSeconds: number, targetSeconds: number) {
+  const met = workedSeconds >= targetSeconds;
+  return {
+    value: `${formatDuration(workedSeconds)} / ${formatWorkTarget(targetSeconds)}`,
+    className: cn("text-2xl leading-tight sm:text-[1.65rem]", met && "text-success"),
+  };
 }

@@ -4,12 +4,14 @@ import { CalendarRange } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDateRange } from "@/lib/utils";
 import { useLocale } from "@/components/layout/locale-provider";
-import { leaveKindKey } from "@/lib/i18n/labels";
+import { leaveKindKey, leavePartKey, leaveStatusKey } from "@/lib/i18n/labels";
 
 export interface UpcomingLeaveItem {
   id: string;
   employeeName: string;
   type: string;
+  dayPart?: string | null;
+  status: string;
   startDate: Date;
   endDate: Date;
   totalDays: number;
@@ -31,6 +33,10 @@ export function UpcomingLeave({ items, showName = true }: { items: UpcomingLeave
     <div className="space-y-3">
       {items.map((item) => {
         const kind = leaveKindKey(item.type);
+        const part = leavePartKey(item.dayPart);
+        const status = leaveStatusKey(item.status);
+        const statusVariant =
+          item.status === "APPROVED" ? "success" : item.status === "PENDING" ? "warning" : item.status === "REJECTED" ? "danger" : "muted";
         const days =
           item.totalDays === 1
             ? t("leave.dayCount", { count: item.totalDays })
@@ -43,7 +49,13 @@ export function UpcomingLeave({ items, showName = true }: { items: UpcomingLeave
                 {formatDateRange(item.startDate, item.endDate, locale)} · {days}
               </p>
             </div>
-            <Badge variant="outline">{kind ? t(kind) : item.type}</Badge>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <Badge variant="outline">
+                {kind ? t(kind) : item.type}
+                {part ? ` · ${t(part)}` : ""}
+              </Badge>
+              <Badge variant={statusVariant}>{status ? t(status) : item.status}</Badge>
+            </div>
           </div>
         );
       })}

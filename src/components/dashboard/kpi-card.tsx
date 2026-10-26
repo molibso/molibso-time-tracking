@@ -7,12 +7,14 @@ export function KpiCard({
   sublabel,
   icon: Icon,
   accent = "primary",
+  valueClassName,
 }: {
   label: string;
   value: string;
   sublabel?: string;
   icon: LucideIcon;
   accent?: "primary" | "success" | "warning" | "danger";
+  valueClassName?: string;
 }) {
   return (
     <div className="rounded-2xl border border-border/80 bg-surface p-6 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-elevated">
@@ -30,7 +32,7 @@ export function KpiCard({
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-4 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
+      <p className={cn("mt-4 text-3xl font-semibold tracking-tight text-foreground", valueClassName)}>{value}</p>
       {sublabel && <p className="mt-1.5 text-xs text-muted-foreground">{sublabel}</p>}
     </div>
   );

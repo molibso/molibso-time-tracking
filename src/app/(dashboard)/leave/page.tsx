@@ -55,6 +55,7 @@ export default async function LeavePage({
   const personRows: MyLeaveRow[] = personLeave.map((l) => ({
     id: l.id,
     type: l.type,
+    dayPart: l.dayPart,
     startDate: l.startDate,
     endDate: l.endDate,
     totalDays: l.totalDays,
@@ -66,6 +67,7 @@ export default async function LeavePage({
     id: l.id,
     employeeName: `${l.employee.firstName} ${l.employee.lastName}`,
     type: l.type,
+    dayPart: l.dayPart,
     startDate: l.startDate,
     endDate: l.endDate,
     totalDays: l.totalDays,

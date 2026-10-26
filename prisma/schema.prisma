@@ -74,6 +74,12 @@ enum LeaveStatus {
   CANCELLED
 }
 
+enum DayPart {
+  FULL
+  MORNING
+  AFTERNOON
+}
+
 enum CorrectionStatus {
   PENDING
   APPROVED
@@ -215,6 +221,10 @@ model Employee {
   taskAssignments   TaskAssignment[] @relation("TaskAssignments")
   taskTimeEntries   TaskTimeEntry[]
   roomReservations  RoomReservation[] @relation("RoomBooker")
+  travelRequests    TravelRequest[]
+  reviewedTravels   TravelRequest[] @relation("TravelReviewer")
+  expenseClaims     ExpenseClaim[]
+  reviewedClaims    ExpenseClaim[]  @relation("ClaimReviewer")
 
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
@@ -326,6 +336,7 @@ model LeaveRequest {
   employee      Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   type          LeaveType
+  dayPart       DayPart     @default(FULL)
   startDate     DateTime
   endDate       DateTime
   totalDays     Float
@@ -562,6 +573,92 @@ model CompanySettings {
   notifyOvertimeAlert   Boolean  @default(true)
 
   updatedAt             DateTime @updatedAt
+}
+
+// ------------------------------------------------------------
+// Expenses (travel request, then the claim)
+// ------------------------------------------------------------
+
+enum ExpenseStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ExpenseLineKind {
+  RECEIPT
+  MILEAGE
+  MEAL
+}
+
+model TravelRequest {
+  id            String        @id @default(cuid())
+  employeeId    String
+  employee      Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  destination   String
+  purpose       String
+  startDate     DateTime
+  endDate       DateTime
+  status        ExpenseStatus @default(PENDING)
+
+  reviewComment String?
+  reviewedById  String?
+  reviewer      Employee?     @relation("TravelReviewer", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+
+  claim         ExpenseClaim?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model ExpenseClaim {
+  id              String        @id @default(cuid())
+  travelRequestId String        @unique
+  travelRequest   TravelRequest @relation(fields: [travelRequestId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  status          ExpenseStatus @default(DRAFT)
+  reviewComment   String?
+  reviewedById    String?
+  reviewer        Employee?     @relation("ClaimReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  submittedAt     DateTime?
+
+  lines           ExpenseLine[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model ExpenseLine {
+  id                String          @id @default(cuid())
+  claimId           String
+  claim             ExpenseClaim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  kind              ExpenseLineKind
+  spentOn           DateTime
+  description       String
+  amountCents       Int
+  receiptPath       String?
+  kilometers        Float?
+  breakfastProvided Boolean         @default(false)
+  lunchProvided     Boolean         @default(false)
+  dinnerProvided    Boolean         @default(false)
+
+  createdAt         DateTime        @default(now())
+
+  @@index([claimId])
 }
 
 // ------------------------------------------------------------

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -34,8 +34,22 @@ export function LeaveRequestDialog() {
     handleSubmit,
     control,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
-  } = useForm<LeaveRequestInput>({ resolver: zodResolver(leaveRequestSchema) });
+  } = useForm<LeaveRequestInput>({
+    resolver: zodResolver(leaveRequestSchema),
+    defaultValues: { dayPart: "FULL" },
+  });
+
+  const leaveType = watch("type");
+  const dayPart = watch("dayPart");
+  const startDate = watch("startDate");
+  const halfVacation = leaveType === "VACATION" && (dayPart === "MORNING" || dayPart === "AFTERNOON");
+
+  useEffect(() => {
+    if (halfVacation && startDate) setValue("endDate", startDate);
+  }, [halfVacation, startDate, setValue]);
 
   async function onSubmit(data: LeaveRequestInput) {
     const result = await createLeaveRequest(data);
@@ -88,15 +102,38 @@ export function LeaveRequestDialog() {
             {errors.type && <p className="text-xs text-danger">{errors.type.message}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {leaveType === "VACATION" && (
+            <div className="space-y-1.5">
+              <Label>{t("leave.span")}</Label>
+              <Controller
+                control={control}
+                name="dayPart"
+                render={({ field }) => (
+                  <Select value={field.value ?? "FULL"} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FULL">{t("leave.span.full")}</SelectItem>
+                      <SelectItem value="MORNING">{t("leave.span.morning")}</SelectItem>
+                      <SelectItem value="AFTERNOON">{t("leave.span.afternoon")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {halfVacation && <p className="text-xs text-muted-foreground">{t("leave.halfHint")}</p>}
+            </div>
+          )}
+
+          <div className={halfVacation ? "grid gap-4" : "grid grid-cols-2 gap-4"}>
             <div className="space-y-1.5">
               <Label htmlFor="startDate">{t("leave.startDate")}</Label>
-              <Input id="startDate" type="date" {...register("startDate", { setValueAs: (v) => new Date(v) })} />
+              <Input id="startDate" type="date" {...register("startDate", { setValueAs: (v) => (v ? new Date(v) : v) })} />
               {errors.startDate && <p className="text-xs text-danger">{errors.startDate.message}</p>}
             </div>
-            <div className="space-y-1.5">
+            <div className={halfVacation ? "hidden" : "space-y-1.5"}>
               <Label htmlFor="endDate">{t("leave.endDate")}</Label>
-              <Input id="endDate" type="date" {...register("endDate", { setValueAs: (v) => new Date(v) })} />
+              <Input id="endDate" type="date" {...register("endDate", { setValueAs: (v) => (v ? new Date(v) : v) })} />
               {errors.endDate && <p className="text-xs text-danger">{errors.endDate.message}</p>}
             </div>
           </div>
