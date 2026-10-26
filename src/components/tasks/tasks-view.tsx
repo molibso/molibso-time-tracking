@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { LayoutGrid, List } from "lucide-react";
+import { FolderKanban, LayoutGrid, List } from "lucide-react";
 import { ProjectEditButton } from "@/components/tasks/project-form-dialog";
+import { ProjectGroups } from "@/components/tasks/project-groups";
 import { TaskBoard } from "@/components/tasks/task-board";
 import { TaskTable, type TaskRow } from "@/components/tasks/task-table";
 import type { TaskFormOption } from "@/components/tasks/task-form-dialog";
@@ -10,9 +11,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/components/layout/locale-provider";
 
-type ViewMode = "list" | "board";
+type ViewMode = "projects" | "list" | "board";
 
-const STORAGE_KEY = "tasks-view-mode";
+const STORAGE_KEY = "tasks-view-mode-v2";
 
 export type ProjectChip = {
   id: string;
@@ -34,13 +35,13 @@ export function TasksView({
   selfId: string;
 }) {
   const { t } = useLocale();
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>("projects");
   const [projectId, setProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved === "list" || saved === "board") setView(saved);
+      if (saved === "projects" || saved === "list" || saved === "board") setView(saved);
     } catch {
       /* ignore */
     }
@@ -72,7 +73,7 @@ export function TasksView({
 
   return (
     <div className="space-y-6">
-      {projects.length > 0 && (
+      {view !== "projects" && projects.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground">{t("tasks.projects")}</h2>
           <div className="flex flex-wrap gap-2">
@@ -125,8 +126,24 @@ export function TasksView({
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-muted-foreground">{t("tasks.all")}</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">
+            {view === "projects" ? t("tasks.projects") : t("tasks.all")}
+          </h2>
           <div className="inline-flex rounded-full border border-border bg-surface p-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className={cn(
+                "h-8 gap-1.5 rounded-full px-3",
+                view === "projects" && "bg-petrol text-petrol-foreground hover:bg-petrol/90 hover:text-petrol-foreground",
+              )}
+              aria-pressed={view === "projects"}
+              onClick={() => select("projects")}
+            >
+              <FolderKanban className="h-3.5 w-3.5" />
+              {t("tasks.viewProjects")}
+            </Button>
             <Button
               type="button"
               size="sm"
@@ -158,7 +175,9 @@ export function TasksView({
           </div>
         </div>
 
-        {view === "list" ? (
+        {view === "projects" ? (
+          <ProjectGroups rows={rows} projects={projects} employees={employees} selfId={selfId} />
+        ) : view === "list" ? (
           <TaskTable rows={rows} projectFilterId={projectId} />
         ) : (
           <TaskBoard rows={rows} projectFilterId={projectId} />

@@ -109,16 +109,19 @@ export default async function TimeTrackingPage({
           </Suspense>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3">
-            <p className="text-base text-muted-foreground">{translate(locale, "time.balanceHint")}</p>
-            <p className={`text-lg font-semibold tabular-nums ${rangeBalance > 0 ? "text-success" : rangeBalance < 0 ? "text-danger" : ""}`}>
-              {workedDays === 0
-                ? translate(locale, "time.balanceEmpty")
-                : rangeBalance === 0
-                  ? translate(locale, "time.balanceEven")
-                  : formatBalance(rangeBalance)}
-            </p>
-          </div>
+          <p
+            className={`text-sm font-medium tabular-nums ${
+              workedDays === 0
+                ? "text-muted-foreground"
+                : rangeBalance > 0
+                  ? "text-success"
+                  : rangeBalance < 0
+                    ? "text-danger"
+                    : "text-foreground"
+            }`}
+          >
+            {workedDays === 0 ? "N/A" : formatBalance(rangeBalance)}
+          </p>
           <ShiftHistory days={attendances} isSelf={view.isSelf} period={range.period} locale={locale} />
         </CardContent>
       </Card>

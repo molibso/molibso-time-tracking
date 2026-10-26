@@ -88,7 +88,7 @@ export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
         </div>
       </div>
 
-      <div className="mb-3 grid grid-cols-7 gap-3 text-center text-base font-medium text-muted-foreground">
+      <div className="mb-3 grid grid-cols-7 gap-3 text-center text-sm font-medium text-muted-foreground">
         {Array.from({ length: 7 }, (_, index) => {
           const date = new Date(2026, 0, 5 + index);
           const label = date.toLocaleDateString(intlLocale(locale), { weekday: "short" });
@@ -106,16 +106,16 @@ export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
               key={i}
               title={entry && showTime ? formatDuration(entry.workedSeconds) : undefined}
               className={cn(
-                "flex min-h-[10.5rem] flex-col items-center justify-center gap-1.5 rounded-xl border px-1.5 py-3",
+                "flex min-h-[8.5rem] flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-3",
                 entry ? cellStyle(entry) : "border-border text-foreground/70",
               )}
             >
-              <span className="text-2xl font-medium leading-none">{day}</span>
+              <span className="text-lg font-medium leading-none">{day}</span>
               {showTime && entry && (
                 <>
-                  <span className="text-base font-medium leading-tight tabular-nums">{compactDuration(entry.workedSeconds)}</span>
+                  <span className="text-sm font-medium leading-tight tabular-nums">{compactDuration(entry.workedSeconds)}</span>
                   {entry.workedSeconds > 0 && balanceSeconds(entry.workedSeconds) !== 0 && (
-                    <span className="text-base font-semibold leading-tight tabular-nums">
+                    <span className="text-sm font-semibold leading-tight tabular-nums">
                       {formatBalance(balanceSeconds(entry.workedSeconds))}
                     </span>
                   )}
@@ -128,7 +128,7 @@ export function AttendanceCalendar({ days }: { days: AttendanceDay[] }) {
 
       <div className="mt-4 flex flex-wrap gap-3">
         {LEGEND.map((item) => (
-          <div key={item.labelKey} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <div key={item.labelKey} className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className={cn("h-2.5 w-2.5 rounded-full border", item.className)} />
             {t(item.labelKey)}
           </div>

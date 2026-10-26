@@ -1,14 +1,18 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getVacationBalance } from "@/lib/queries/dashboard";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ProfileForm } from "@/components/profile/profile-form";
 import { PasswordForm } from "@/components/profile/password-form";
 import { translate } from "@/lib/i18n/messages";
-import { initials, formatDate, formatTime } from "@/lib/utils";
+import { initials, formatDate } from "@/lib/utils";
 import { getLocale } from "@/lib/i18n/get-locale";
+
+function formatDays(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
 
 export default async function ProfilePage() {
   const locale = await getLocale();
@@ -17,13 +21,9 @@ export default async function ProfilePage() {
   const employeeId = session.user.employeeId;
   if (!employeeId) redirect("/dashboard");
 
-  const [employee, upcomingShifts] = await Promise.all([
+  const [employee, vacation] = await Promise.all([
     prisma.employee.findUnique({ where: { id: employeeId }, include: { department: true, user: true } }),
-    prisma.shift.findMany({
-      where: { employeeId, startTime: { gte: new Date() } },
-      orderBy: { startTime: "asc" },
-      take: 5,
-    }),
+    getVacationBalance(employeeId),
   ]);
 
   if (!employee) redirect("/dashboard");
@@ -53,35 +53,33 @@ export default async function ProfilePage() {
               </Badge>
             </div>
             <dl className="mt-6 space-y-2 text-left text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Employee code</dt>
-                <dd>{employee.employeeCode}</dd>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">{translate(locale, "kpi.vacation")}</dt>
+                <dd className="font-semibold tabular-nums">{formatDays(vacation.remaining)}</dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt className="text-muted-foreground">Email</dt>
                 <dd className="truncate">{employee.user.email}</dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt className="text-muted-foreground">Hire date</dt>
                 <dd className="tabular-nums">{formatDate(employee.hireDate, locale)}</dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt className="text-muted-foreground">Weekly hours</dt>
                 <dd>{employee.weeklyHours}h</dd>
               </div>
             </dl>
+            <p className="mt-2 text-left text-sm text-muted-foreground">
+              {translate(locale, "kpi.vacationUsed", {
+                used: formatDays(vacation.used),
+                allowance: formatDays(vacation.allowance),
+              })}
+            </p>
           </CardContent>
         </Card>
 
         <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Edit profile</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProfileForm defaultValues={{ phone: employee.phone ?? "", avatarUrl: employee.avatarUrl ?? "" }} />
-            </CardContent>
-          </Card>
           <Card>
             <CardHeader>
               <CardTitle>{translate(locale, "profile.passwordTitle")}</CardTitle>
@@ -93,31 +91,6 @@ export default async function ProfilePage() {
           </Card>
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Upcoming schedule</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {upcomingShifts.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No shifts scheduled yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {upcomingShifts.map((s) => (
-                <div key={s.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
-                  <div>
-                    <p className="text-sm font-medium">{s.title}</p>
-                    <p className="text-xs text-muted-foreground">{s.location ?? "—"}</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(s.startTime, locale)} {formatTime(s.startTime, false, locale)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

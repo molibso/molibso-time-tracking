@@ -1,70 +1,85 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
-import { cancelReservation, createMeetingRoom, reserveRoom } from "@/actions/rooms";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { cancelReservation, reserveRoom } from "@/actions/rooms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useLocale } from "@/components/layout/locale-provider";
-
-type Option = { id: string; label: string };
+import { intlLocale } from "@/lib/i18n/messages";
+import { cn } from "@/lib/utils";
 
 export type ReservationRow = {
   id: string;
   title: string;
-  roomName: string;
   start: string;
   end: string;
   who: string;
-  projectName: string | null;
   canCancel: boolean;
 };
 
+function startOfWeek(date: Date) {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = next.getDay();
+  next.setDate(next.getDate() + (day === 0 ? -6 : 1 - day));
+  return next;
+}
+
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function dateInput(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export function RoomsBoard({
-  rooms,
-  projects,
+  roomId,
   reservations,
 }: {
-  rooms: Option[];
-  projects: Option[];
+  roomId: string;
   reservations: ReservationRow[];
 }) {
   const router = useRouter();
   const { t, locale } = useLocale();
   const [isPending, startTransition] = useTransition();
-  const [roomId, setRoomId] = useState(rooms[0]?.id ?? "");
-  const [projectId, setProjectId] = useState("");
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [bookDate, setBookDate] = useState(() => dateInput(new Date()));
+  const tag = intlLocale(locale);
+  const now = new Date();
 
-  useEffect(() => {
-    if (!rooms.some((room) => room.id === roomId)) setRoomId(rooms[0]?.id ?? "");
-  }, [rooms, roomId]);
+  const days = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + index);
+      return date;
+    }),
+    [weekStart],
+  );
 
-  function addRoom(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const capacityRaw = String(formData.get("capacity") ?? "").trim();
-    startTransition(async () => {
-      const result = await createMeetingRoom({
-        name: String(formData.get("name") ?? ""),
-        location: String(formData.get("location") ?? ""),
-        capacity: capacityRaw ? Number(capacityRaw) : null,
-      });
-      if (result.success) {
-        toast.success(result.message);
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
+  const current = reservations.find((item) => {
+    const start = new Date(item.start);
+    const end = new Date(item.end);
+    return start <= now && end > now;
+  });
+
+  function shiftWeek(delta: number) {
+    setWeekStart((currentStart) => {
+      const next = new Date(currentStart);
+      next.setDate(next.getDate() + delta * 7);
+      return next;
     });
   }
 
   function book(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     startTransition(async () => {
       const result = await reserveRoom({
         roomId,
@@ -72,11 +87,10 @@ export function RoomsBoard({
         date: String(formData.get("date") ?? ""),
         start: String(formData.get("start") ?? ""),
         end: String(formData.get("end") ?? ""),
-        projectId: projectId || null,
-        note: String(formData.get("note") ?? ""),
       });
       if (result.success) {
         toast.success(result.message);
+        form.reset();
         router.refresh();
       } else {
         toast.error(result.error);
@@ -96,136 +110,108 @@ export function RoomsBoard({
     });
   }
 
-  const dateFormatter = new Intl.DateTimeFormat(locale === "de" ? "de-DE" : locale === "fr" ? "fr-FR" : "en-GB", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const weekLabel = `${days[0].toLocaleDateString(tag, { month: "short", day: "numeric" })} – ${days[6].toLocaleDateString(tag, { month: "short", day: "numeric" })}`;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <section className="space-y-6">
-        <form onSubmit={addRoom} className="space-y-3 rounded-2xl border border-border bg-surface p-5">
-          <h2 className="text-base font-semibold">{t("rooms.addRoom")}</h2>
-          <div className="space-y-1.5">
-            <Label htmlFor="room-name">{t("rooms.roomName")}</Label>
-            <Input id="room-name" name="name" required />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="room-location">{t("rooms.location")}</Label>
-              <Input id="room-location" name="location" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="room-capacity">{t("rooms.capacity")}</Label>
-              <Input id="room-capacity" name="capacity" type="number" min={1} max={500} />
-            </div>
-          </div>
-          <Button type="submit" disabled={isPending}>
-            {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {t("rooms.addRoom")}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
+        <p className={cn("text-sm font-medium", current ? "text-warning" : "text-success")}>
+          {current
+            ? `${t("rooms.inUse", { time: new Date(current.end).toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" }) })} · ${current.title}`
+            : t("rooms.freeNow")}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="icon" onClick={() => shiftWeek(-1)} aria-label="Previous week">
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-        </form>
+          <Button type="button" variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(new Date()))}>
+            {t("rooms.thisWeek")}
+          </Button>
+          <span className="min-w-[8.5rem] text-center text-sm font-medium tabular-nums">{weekLabel}</span>
+          <Button type="button" variant="outline" size="icon" onClick={() => shiftWeek(1)} aria-label="Next week">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
-        <form onSubmit={book} className="space-y-3 rounded-2xl border border-border bg-surface p-5">
-          <h2 className="text-base font-semibold">{t("rooms.reserveTitle")}</h2>
-          {rooms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("rooms.emptyRooms")}</p>
-          ) : (
-            <>
-              <div className="space-y-1.5">
-                <Label>{t("rooms.roomName")}</Label>
-                <Select value={roomId} onValueChange={setRoomId}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rooms.map((room) => (
-                      <SelectItem key={room.id} value={room.id}>
-                        {room.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="purpose">{t("rooms.purpose")}</Label>
-                <Input id="purpose" name="title" required placeholder={t("meetings.placeholder")} />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="reserve-date">{t("rooms.date")}</Label>
-                  <Input id="reserve-date" name="date" type="date" required />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="reserve-start">{t("rooms.start")}</Label>
-                  <Input id="reserve-start" name="start" type="time" required />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="reserve-end">{t("rooms.end")}</Label>
-                  <Input id="reserve-end" name="end" type="time" required />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>{t("tasks.field.project")}</Label>
-                <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("ph.optional")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">{t("tasks.field.noProject")}</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reserve-note">{t("rooms.note")}</Label>
-                <Input id="reserve-note" name="note" />
-              </div>
-              <Button type="submit" disabled={isPending || !roomId}>
-                {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {t("rooms.reserve")}
-              </Button>
-            </>
-          )}
-        </form>
-      </section>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-7">
+        {days.map((day) => {
+          const slots = reservations
+            .filter((item) => sameDay(new Date(item.start), day))
+            .sort((a, b) => a.start.localeCompare(b.start));
+          const today = sameDay(day, now);
+          return (
+            <section
+              key={dateInput(day)}
+              className={cn(
+                "flex min-h-[12rem] flex-col rounded-2xl border bg-surface p-3",
+                today ? "border-petrol" : "border-border",
+              )}
+            >
+              <button
+                type="button"
+                className="mb-2 text-left"
+                onClick={() => setBookDate(dateInput(day))}
+              >
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {day.toLocaleDateString(tag, { weekday: "short" })}
+                </p>
+                <p className={cn("text-lg font-semibold tabular-nums", today && "text-petrol")}>{day.getDate()}</p>
+              </button>
+              {slots.length === 0 ? (
+                <p className="mt-auto text-sm text-muted-foreground">{t("rooms.free")}</p>
+              ) : (
+                <ul className="space-y-2">
+                  {slots.map((slot) => (
+                    <li key={slot.id} className="rounded-xl bg-petrol/10 px-2.5 py-2 text-sm">
+                      <p className="font-medium leading-snug">{slot.title}</p>
+                      <p className="tabular-nums text-muted-foreground">
+                        {new Date(slot.start).toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" })}
+                        {" – "}
+                        {new Date(slot.end).toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                      <p className="text-muted-foreground">{slot.who}</p>
+                      {slot.canCancel && (
+                        <button
+                          type="button"
+                          className="mt-1 text-xs font-medium text-danger hover:underline"
+                          disabled={isPending}
+                          onClick={() => cancel(slot.id)}
+                        >
+                          {t("rooms.cancel")}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })}
+      </div>
 
-      <section className="rounded-2xl border border-border bg-surface p-5">
-        <h2 className="mb-3 text-base font-semibold">{t("rooms.upcoming")}</h2>
-        {reservations.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">{t("rooms.none")}</p>
-        ) : (
-          <ul className="space-y-2">
-            {reservations.map((reservation) => (
-              <li key={reservation.id} className="flex items-start justify-between gap-3 rounded-xl border border-border px-3 py-3">
-                <div className="min-w-0">
-                  <p className="font-medium">{reservation.title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {reservation.roomName}
-                    {reservation.projectName ? ` · ${reservation.projectName}` : ""}
-                  </p>
-                  <p className="text-sm tabular-nums text-muted-foreground">
-                    {dateFormatter.format(new Date(reservation.start))} – {dateFormatter.format(new Date(reservation.end))}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{t("rooms.bookedBy", { name: reservation.who })}</p>
-                </div>
-                {reservation.canCancel && (
-                  <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => cancel(reservation.id)}>
-                    {t("rooms.cancel")}
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <form onSubmit={book} className="grid gap-3 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_auto_auto_auto_auto] lg:items-end">
+        <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+          <Label htmlFor="purpose">{t("rooms.bookSlot")}</Label>
+          <Input id="purpose" name="title" required placeholder={t("rooms.purpose")} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="reserve-date">{t("rooms.date")}</Label>
+          <Input id="reserve-date" name="date" type="date" required value={bookDate} onChange={(event) => setBookDate(event.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="reserve-start">{t("rooms.start")}</Label>
+          <Input id="reserve-start" name="start" type="time" required defaultValue="09:00" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="reserve-end">{t("rooms.end")}</Label>
+          <Input id="reserve-end" name="end" type="time" required defaultValue="10:00" />
+        </div>
+        <Button type="submit" disabled={isPending}>
+          {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          {t("rooms.reserve")}
+        </Button>
+      </form>
     </div>
   );
 }
