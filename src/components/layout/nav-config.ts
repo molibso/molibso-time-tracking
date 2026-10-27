@@ -8,7 +8,6 @@ import {
   BarChart3,
   Settings,
   CheckSquare,
-  Video,
   CalendarClock,
   Receipt,
 } from "lucide-react";
@@ -28,7 +27,6 @@ export const NAV_ITEMS: NavItem[] = [
   { labelKey: "nav.attendance", href: "/attendance", icon: CalendarDays },
   { labelKey: "nav.leave", href: "/leave", icon: PlaneTakeoff },
   { labelKey: "nav.tasks", href: "/tasks", icon: CheckSquare },
-  { labelKey: "nav.meetings", href: "/meetings", icon: Video },
   { labelKey: "nav.rooms", href: "/rooms", icon: CalendarClock },
   { labelKey: "nav.expenses", href: "/expenses", icon: Receipt },
   { labelKey: "nav.team", href: "/employees", icon: Users, roles: ["ADMIN"] },

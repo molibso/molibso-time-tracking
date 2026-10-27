@@ -10,7 +10,6 @@ import type { ActionResult } from "./auth";
 
 function refreshWork() {
   revalidatePath("/tasks");
-  revalidatePath("/meetings");
   revalidatePath("/dashboard");
 }
 

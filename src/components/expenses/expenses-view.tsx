@@ -29,6 +29,7 @@ import {
   addExpenseLine,
   createTravelRequest,
   deleteExpenseLine,
+  deleteTravelRequest,
   reviewExpenseClaim,
   submitExpenseClaim,
 } from "@/actions/expenses";
@@ -233,14 +234,35 @@ function TripCard({
             {formatDateRange(trip.startDate, trip.endDate, locale)} · {trip.purpose}
           </p>
         </div>
+        <div className="flex items-center gap-3">
+          <p className="text-right">
+            <span className="block text-xs text-muted-foreground">{t("expenses.toReturn")}</span>
+            <span className="text-lg font-semibold tabular-nums">{money(total)}</span>
+          </p>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("expenses.delete")}
+            disabled={pending}
+            onClick={() => {
+              if (!window.confirm(t("expenses.deleteConfirm"))) return;
+              start(async () => {
+                const result = await deleteTravelRequest(trip.id);
+                if (result.success) {
+                  toast.success(result.message);
+                  router.refresh();
+                } else toast.error(result.error);
+              });
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {trip.claim && (
         <div className="mt-4 space-y-3 border-t border-border pt-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium">
-              {t("expenses.total")}: {money(total)}
-            </p>
+          <div className="flex items-center justify-end gap-2">
             <Badge variant={statusVariant(trip.claim.status)}>{statusLabel(trip.claim.status)}</Badge>
           </div>
           {trip.claim.reviewComment && <p className="text-sm text-muted-foreground">{trip.claim.reviewComment}</p>}

@@ -1,6 +1,6 @@
 "use server";
 
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
@@ -124,18 +124,27 @@ export async function reviewTravelRequest(input: {
   }
 }
 
-export async function cancelTravelRequest(id: string): Promise<ActionResult> {
+export async function deleteTravelRequest(id: string): Promise<ActionResult> {
   try {
     const session = await auth();
     if (!session?.user.employeeId) return { success: false, error: "Not authenticated" };
-    const travel = await prisma.travelRequest.findUnique({ where: { id } });
-    if (!travel || travel.employeeId !== session.user.employeeId) return { success: false, error: "Travel request not found." };
-    if (travel.status !== "PENDING") return { success: false, error: "Only a pending request can be cancelled." };
-    await prisma.travelRequest.update({ where: { id }, data: { status: "CANCELLED" } });
+    const travel = await prisma.travelRequest.findUnique({
+      where: { id },
+      include: { claim: { include: { lines: true } } },
+    });
+    const boss = hasPermission(session.user.role, "EXPENSE_APPROVE");
+    if (!travel || (travel.employeeId !== session.user.employeeId && !boss)) {
+      return { success: false, error: "Trip not found." };
+    }
+    const receipts = travel.claim?.lines.map((line) => line.receiptPath).filter((file): file is string => Boolean(file)) ?? [];
+    await prisma.travelRequest.delete({ where: { id } });
+    await Promise.all(
+      receipts.map((file) => unlink(path.join(process.cwd(), "data", "receipts", file)).catch(() => undefined)),
+    );
     revalidate();
-    return { success: true, message: "Travel request cancelled." };
+    return { success: true, message: "Trip deleted." };
   } catch (err: any) {
-    return { success: false, error: err.message ?? "Failed to cancel the travel request" };
+    return { success: false, error: err.message ?? "Failed to delete the trip" };
   }
 }
 

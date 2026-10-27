@@ -32,7 +32,6 @@ async function stopOpenTimer(employeeId: string) {
 
 function refreshTracked() {
   revalidatePath("/tasks");
-  revalidatePath("/meetings");
 }
 
 async function assertCanTrackTask(taskId: string, employeeId: string) {
