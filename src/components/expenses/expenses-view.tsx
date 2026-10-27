@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -27,16 +27,15 @@ import { formatDate, formatDateRange } from "@/lib/utils";
 import { formatEuros } from "@/lib/expenses";
 import {
   addExpenseLine,
-  cancelTravelRequest,
   createTravelRequest,
   deleteExpenseLine,
   reviewExpenseClaim,
-  reviewTravelRequest,
   submitExpenseClaim,
 } from "@/actions/expenses";
 
 export type TripRow = {
   id: string;
+  employeeName?: string | null;
   destination: string;
   purpose: string;
   startDate: string;
@@ -49,15 +48,6 @@ export type TripRow = {
     reviewComment: string | null;
     lines: { id: string; kind: string; spentOn: string; description: string; amountCents: number; hasReceipt: boolean }[];
   } | null;
-};
-
-export type TravelQueueRow = {
-  id: string;
-  employeeName: string;
-  destination: string;
-  purpose: string;
-  startDate: string;
-  endDate: string;
 };
 
 export type ClaimQueueRow = {
@@ -85,12 +75,12 @@ function statusVariant(status: string): "success" | "warning" | "danger" | "mute
 export function ExpensesView({
   canApprove,
   trips,
-  travelQueue,
+  history,
   claimQueue,
 }: {
   canApprove: boolean;
   trips: TripRow[];
-  travelQueue: TravelQueueRow[];
+  history: TripRow[];
   claimQueue: ClaimQueueRow[];
 }) {
   const { locale, t } = useLocale();
@@ -102,51 +92,45 @@ export function ExpensesView({
     return key ? t(key) : status;
   }
 
-  const tripsList = (
+  const tripsList = (items: TripRow[], readOnly: boolean) => (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <TravelDialog />
-      </div>
-      {trips.length === 0 ? (
+      {!readOnly && (
+        <div className="flex justify-end">
+          <TravelDialog />
+        </div>
+      )}
+      {items.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">{t("expenses.empty")}</p>
       ) : (
-        trips.map((trip) => (
-          <TripCard key={trip.id} trip={trip} money={money} statusLabel={statusLabel} />
+        items.map((trip) => (
+          <TripCard key={trip.id} trip={trip} money={money} statusLabel={statusLabel} readOnly={readOnly} />
         ))
       )}
     </div>
   );
 
-  if (!canApprove) return <Card><CardContent className="pt-5">{tripsList}</CardContent></Card>;
+  if (!canApprove) return <Card><CardContent className="pt-5">{tripsList(trips, false)}</CardContent></Card>;
 
-  const waiting = travelQueue.length + claimQueue.length;
   return (
-    <Tabs defaultValue="approvals">
+    <Tabs defaultValue="history">
       <TabsList>
+        <TabsTrigger value="history">{t("expenses.history")}</TabsTrigger>
         <TabsTrigger value="approvals">
-          {t("expenses.approvals")} {waiting > 0 && `(${waiting})`}
+          {t("expenses.approvals")} {claimQueue.length > 0 && `(${claimQueue.length})`}
         </TabsTrigger>
         <TabsTrigger value="mine">{t("expenses.myTrips")}</TabsTrigger>
       </TabsList>
+      <TabsContent value="history">
+        <Card><CardContent className="pt-5">{tripsList(history, true)}</CardContent></Card>
+      </TabsContent>
       <TabsContent value="approvals">
         <Card>
-          <CardContent className="space-y-8 pt-5">
-            <ApprovalSection
-              title={t("expenses.travelQueue")}
-              rows={travelQueue}
-              render={(row) => (
-                <ReviewRow
-                  key={row.id}
-                  title={row.employeeName}
-                  detail={`${row.destination} · ${formatDateRange(row.startDate, row.endDate, locale)}`}
-                  note={row.purpose}
-                  onReview={(status, reviewComment) => reviewTravelRequest({ id: row.id, status, reviewComment })}
-                />
-              )}
-            />
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold">{t("expenses.claimQueue")}</h2>
-              {claimQueue.length === 0 ? null : claimQueue.map((claim) => (
+          <CardContent className="space-y-3 pt-5">
+            <h2 className="text-sm font-semibold">{t("expenses.claimQueue")}</h2>
+            {claimQueue.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t("expenses.nonePending")}</p>
+            ) : (
+              claimQueue.map((claim) => (
                 <ReviewRow
                   key={claim.id}
                   title={`${claim.employeeName} · ${money(claim.totalCents)}`}
@@ -155,36 +139,15 @@ export function ExpensesView({
                   receiptIds={claim.lines.filter((line) => line.hasReceipt).map((line) => line.id)}
                   onReview={(status, reviewComment) => reviewExpenseClaim({ id: claim.id, status, reviewComment })}
                 />
-              ))}
-              {travelQueue.length === 0 && claimQueue.length === 0 && (
-                <p className="py-6 text-center text-sm text-muted-foreground">{t("expenses.nonePending")}</p>
-              )}
-            </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </TabsContent>
       <TabsContent value="mine">
-        <Card><CardContent className="pt-5">{tripsList}</CardContent></Card>
+        <Card><CardContent className="pt-5">{tripsList(trips, false)}</CardContent></Card>
       </TabsContent>
     </Tabs>
-  );
-}
-
-function ApprovalSection<T>({
-  title,
-  rows,
-  render,
-}: {
-  title: string;
-  rows: T[];
-  render: (row: T) => ReactNode;
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="space-y-3">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      {rows.map((row) => render(row))}
-    </div>
   );
 }
 
@@ -247,47 +210,28 @@ function TripCard({
   trip,
   money,
   statusLabel,
+  readOnly,
 }: {
   trip: TripRow;
   money: (cents: number) => string;
   statusLabel: (status: string) => string;
+  readOnly: boolean;
 }) {
   const { locale, t } = useLocale();
   const router = useRouter();
   const [pending, start] = useTransition();
-  const editable = trip.claim && (trip.claim.status === "DRAFT" || trip.claim.status === "REJECTED");
+  const editable = !readOnly && trip.claim && (trip.claim.status === "DRAFT" || trip.claim.status === "REJECTED");
   const total = trip.claim?.lines.reduce((sum, line) => sum + line.amountCents, 0) ?? 0;
 
   return (
     <div className="rounded-xl border border-border p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
+          {trip.employeeName && <p className="text-sm font-medium text-petrol">{trip.employeeName}</p>}
           <p className="font-medium">{trip.destination}</p>
           <p className="text-sm text-muted-foreground">
             {formatDateRange(trip.startDate, trip.endDate, locale)} · {trip.purpose}
           </p>
-          {trip.reviewComment && <p className="mt-1 text-sm text-muted-foreground">{trip.reviewComment}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={statusVariant(trip.status)}>{statusLabel(trip.status)}</Badge>
-          {trip.status === "PENDING" && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={pending}
-              onClick={() =>
-                start(async () => {
-                  const result = await cancelTravelRequest(trip.id);
-                  if (result.success) {
-                    toast.success(result.message);
-                    router.refresh();
-                  } else toast.error(result.error);
-                })
-              }
-            >
-              {t("common.cancel")}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -505,7 +449,7 @@ function TravelDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
             <Button type="submit" disabled={pending}>
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t("leave.submit")}
+              {t("expenses.request")}
             </Button>
           </DialogFooter>
         </form>

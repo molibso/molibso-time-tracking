@@ -66,10 +66,12 @@ export async function createTravelRequest(input: {
         purpose,
         startDate: start,
         endDate: end,
+        status: "APPROVED",
+        claim: { create: { employeeId: session.user.employeeId } },
       },
     });
     revalidate();
-    return { success: true, message: "Travel request submitted." };
+    return { success: true, message: "Trip added." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to submit the travel request" };
   }

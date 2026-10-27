@@ -5,7 +5,7 @@ import { hasPermission } from "@/lib/rbac";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { translate } from "@/lib/i18n/messages";
 import { RoleBadge } from "@/components/layout/role-badge";
-import { ExpensesView, type ClaimQueueRow, type TravelQueueRow, type TripRow } from "@/components/expenses/expenses-view";
+import { ExpensesView, type ClaimQueueRow, type TripRow } from "@/components/expenses/expenses-view";
 
 export default async function ExpensesPage() {
   const session = await auth();
@@ -15,17 +15,22 @@ export default async function ExpensesPage() {
   const canApprove = hasPermission(session.user.role, "EXPENSE_APPROVE");
   const locale = await getLocale();
 
-  const [trips, pendingTravel, pendingClaims] = await Promise.all([
+  const tripInclude = {
+    employee: { select: { firstName: true, lastName: true } },
+    claim: { include: { lines: { orderBy: { spentOn: "asc" as const } } } },
+  };
+
+  const [trips, history, pendingClaims] = await Promise.all([
     prisma.travelRequest.findMany({
       where: { employeeId },
-      include: { claim: { include: { lines: { orderBy: { spentOn: "asc" } } } } },
+      include: tripInclude,
       orderBy: { startDate: "desc" },
     }),
     canApprove
       ? prisma.travelRequest.findMany({
-          where: { status: "PENDING" },
-          include: { employee: true },
-          orderBy: { createdAt: "asc" },
+          where: { status: { not: "CANCELLED" } },
+          include: tripInclude,
+          orderBy: { startDate: "desc" },
         })
       : Promise.resolve([]),
     canApprove
@@ -37,39 +42,36 @@ export default async function ExpensesPage() {
       : Promise.resolve([]),
   ]);
 
-  const tripRows: TripRow[] = trips.map((trip) => ({
-    id: trip.id,
-    destination: trip.destination,
-    purpose: trip.purpose,
-    startDate: trip.startDate.toISOString(),
-    endDate: trip.endDate.toISOString(),
-    status: trip.status,
-    reviewComment: trip.reviewComment,
-    claim: trip.claim
-      ? {
-          id: trip.claim.id,
-          status: trip.claim.status,
-          reviewComment: trip.claim.reviewComment,
-          lines: trip.claim.lines.map((line) => ({
-            id: line.id,
-            kind: line.kind,
-            spentOn: line.spentOn.toISOString(),
-            description: line.description,
-            amountCents: line.amountCents,
-            hasReceipt: Boolean(line.receiptPath),
-          })),
-        }
-      : null,
-  }));
+  function toTripRow(trip: (typeof trips)[number], withName: boolean): TripRow {
+    return {
+      id: trip.id,
+      employeeName: withName ? `${trip.employee.firstName} ${trip.employee.lastName}` : null,
+      destination: trip.destination,
+      purpose: trip.purpose,
+      startDate: trip.startDate.toISOString(),
+      endDate: trip.endDate.toISOString(),
+      status: trip.status,
+      reviewComment: trip.reviewComment,
+      claim: trip.claim
+        ? {
+            id: trip.claim.id,
+            status: trip.claim.status,
+            reviewComment: trip.claim.reviewComment,
+            lines: trip.claim.lines.map((line) => ({
+              id: line.id,
+              kind: line.kind,
+              spentOn: line.spentOn.toISOString(),
+              description: line.description,
+              amountCents: line.amountCents,
+              hasReceipt: Boolean(line.receiptPath),
+            })),
+          }
+        : null,
+    };
+  }
 
-  const travelQueue: TravelQueueRow[] = pendingTravel.map((trip) => ({
-    id: trip.id,
-    employeeName: `${trip.employee.firstName} ${trip.employee.lastName}`,
-    destination: trip.destination,
-    purpose: trip.purpose,
-    startDate: trip.startDate.toISOString(),
-    endDate: trip.endDate.toISOString(),
-  }));
+  const tripRows: TripRow[] = trips.map((trip) => toTripRow(trip, false));
+  const historyRows: TripRow[] = history.map((trip) => toTripRow(trip, true));
 
   const claimQueue: ClaimQueueRow[] = pendingClaims.map((claim) => ({
     id: claim.id,
@@ -107,7 +109,7 @@ export default async function ExpensesPage() {
           </a>
         )}
       </div>
-      <ExpensesView canApprove={canApprove} trips={tripRows} travelQueue={travelQueue} claimQueue={claimQueue} />
+      <ExpensesView canApprove={canApprove} trips={tripRows} history={historyRows} claimQueue={claimQueue} />
     </div>
   );
 }
