@@ -7,6 +7,7 @@ import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
 
 const SIX_HOURS = 6 * 60 * 60;
 const FULL_DAY_OFF = [LeaveType.VACATION, LeaveType.SICK, LeaveType.PERSONAL, LeaveType.HALF_DAY];
+const REMINDER_LEAVE = [...FULL_DAY_OFF, LeaveType.OUT_OF_OFFICE];
 
 function timeToday(hhmm: string, now: Date): Date {
   const [hours, minutes] = hhmm.split(":").map(Number);
@@ -51,7 +52,7 @@ export async function sendWorkdayReminders() {
       where: {
         employeeId: { in: ids },
         status: LeaveStatus.APPROVED,
-        type: { in: FULL_DAY_OFF },
+        type: { in: REMINDER_LEAVE },
         startDate: { lte: todayEnd },
         endDate: { gte: todayStart },
       },
@@ -67,17 +68,19 @@ export async function sendWorkdayReminders() {
     const mine = entries.filter((entry) => entry.employeeId === employee.id);
     const open = mine.find((entry) => !entry.clockOut);
     const onBreak = open?.breaks.some((item) => !item.endedAt) ?? false;
+    const mineLeaves = leaves.filter((leave) => leave.employeeId === employee.id);
+    const outToday = mineLeaves.some((leave) => leave.type === LeaveType.OUT_OF_OFFICE);
     const owed = owedSecondsOnDay(
       employee.weeklyHours,
       now,
       toDaysOff(
-        leaves.filter((leave) => leave.employeeId === employee.id),
+        mineLeaves.filter((leave) => leave.type !== LeaveType.OUT_OF_OFFICE),
         holidays,
         todayStart,
       ),
     );
 
-    if (clockInOn && now >= dayStart && owed > 0 && mine.length === 0) {
+    if (clockInOn && !outToday && now >= dayStart && owed > 0 && mine.length === 0) {
       await notifyOnceToday({
         userId: employee.userId,
         type: NotificationType.CLOCK_IN_REMINDER,

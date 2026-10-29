@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { Search, LogOut, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
-import { signOut } from "next-auth/react";
+import { SignOutDialog, useSignOutChoice } from "@/components/layout/sign-out-dialog";
 import { visibleNavItems } from "./nav-config";
 import { useBeginNavigation } from "./navigation-pending";
 import { useLocale } from "@/components/layout/locale-provider";
@@ -17,6 +17,7 @@ export function CommandPalette({ role }: { role: Role }) {
   const beginNavigation = useBeginNavigation();
   const { setTheme, theme } = useTheme();
   const { t } = useLocale();
+  const signOutChoice = useSignOutChoice();
 
   React.useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -87,7 +88,10 @@ export function CommandPalette({ role }: { role: Role }) {
               {t("common.toggleTheme")}
             </Command.Item>
             <Command.Item
-              onSelect={() => signOut({ callbackUrl: "/login" })}
+              onSelect={() => {
+                setOpen(false);
+                void signOutChoice.request();
+              }}
               className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-danger data-[selected=true]:bg-danger/10"
             >
               <LogOut className="h-4 w-4" />
@@ -96,6 +100,13 @@ export function CommandPalette({ role }: { role: Role }) {
           </Command.Group>
         </Command.List>
       </Command.Dialog>
+      <SignOutDialog
+        open={signOutChoice.open}
+        pending={signOutChoice.pending}
+        onOpenChange={signOutChoice.setOpen}
+        onClockOut={() => void signOutChoice.clockOutAndLeave()}
+        onLeaveOnly={() => void signOutChoice.leaveOnly()}
+      />
     </>
   );
 }

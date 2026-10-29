@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { ClockStatus } from "@/types/clock";
 import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
 import { expectedWorkSeconds, owedSecondsOnDay, toDaysOff, type DayOff } from "@/lib/expected-hours";
+import { dateKey, outOfOfficeContext, topUpSeconds } from "@/lib/out-of-office";
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, secondsBetween } from "@/lib/utils";
 import { intlLocale, type Locale } from "@/lib/i18n/messages";
 import type { WorkedChartPoint } from "@/lib/chart-range";
@@ -84,11 +85,30 @@ export async function getTodayWorkedBreakdown(employeeId: string) {
     now,
   );
 
+  const office = await outOfOfficeContext(employeeId, monthStart, todayEnd);
+  const todayKey = dateKey(todayStart);
+  let todayCredit = 0;
+  let weekCredit = 0;
+  let monthCredit = 0;
+  const cursor = startOfDay(monthStart);
+  while (cursor <= todayStart) {
+    const key = dateKey(cursor);
+    const isToday = key === todayKey;
+    if (office.days.has(key) && !(isToday && openClockIn)) {
+      const clocked = sumWorkedSeconds(entries, { from: startOfDay(cursor), to: endOfDay(cursor) }, now);
+      const extra = topUpSeconds(clocked, office.dailySeconds, true);
+      monthCredit += extra;
+      if (cursor >= weekStart) weekCredit += extra;
+      if (isToday) todayCredit += extra;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
   return {
-    closedSecondsToday,
+    closedSecondsToday: closedSecondsToday + todayCredit,
     closedBreakSecondsToday,
-    closedSecondsWeek,
-    closedSecondsMonth,
+    closedSecondsWeek: closedSecondsWeek + weekCredit,
+    closedSecondsMonth: closedSecondsMonth + monthCredit,
     openClockIn: openClockIn?.toISOString() ?? null,
     openBreakStartedAt: openBreakStartedAt?.toISOString() ?? null,
     completedBreakSecondsOnOpen,
@@ -131,15 +151,23 @@ export async function getWorkedChart(
   }
   if (days.length === 0) days.push(today);
 
-  const entries = await prisma.clockEntry.findMany({
-    where: { employeeId, clockIn: { gte: first, lte: endOfDay(last) } },
-    include: { breaks: true },
-  });
+  const [entries, office] = await Promise.all([
+    prisma.clockEntry.findMany({
+      where: { employeeId, clockIn: { gte: first, lte: endOfDay(last) } },
+      include: { breaks: true },
+    }),
+    outOfOfficeContext(employeeId, first, last),
+  ]);
+  const openToday = entries.some((entry) => !entry.clockOut);
 
   const tag = intlLocale(locale);
   const longRange = days.length > 7;
   return days.map((day) => {
-    const seconds = sumWorkedSeconds(entries, { from: day, to: endOfDay(day) }, now);
+    let seconds = sumWorkedSeconds(entries, { from: day, to: endOfDay(day) }, now);
+    const isToday = dateKey(day) === dateKey(today);
+    if (office.days.has(dateKey(day)) && day <= today && !(isToday && openToday)) {
+      seconds += topUpSeconds(seconds, office.dailySeconds, true);
+    }
     const label = day.toLocaleDateString(tag, longRange ? { day: "2-digit", month: "2-digit" } : { weekday: "short" });
     return { day: label, seconds, hours: +(seconds / 3600).toFixed(2), future: day > today };
   });

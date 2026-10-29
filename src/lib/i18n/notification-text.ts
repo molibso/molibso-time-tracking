@@ -6,6 +6,7 @@ const LEAVE_TYPES: Record<string, MessageKey> = {
   personal: "leaveType.personal",
   "half day": "leaveType.halfDay",
   "work from home": "leaveType.wfh",
+  "out of office": "leaveType.ooo",
 };
 
 function leaveTypeLabel(locale: Locale, raw: string): string {

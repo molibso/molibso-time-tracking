@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
+import { verifyTotp } from "@/lib/totp";
 import authConfig from "@/lib/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -12,25 +13,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        code: { label: "Code", type: "text" },
       },
       async authorize(raw) {
         const parsed = loginSchema.safeParse(raw);
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
+        const code = String((raw as { code?: string } | undefined)?.code ?? "");
 
         const user = await prisma.user.findUnique({
           where: { email: email.toLowerCase() },
           include: { employee: true },
         });
 
-        if (!user || !user.isActive) return null;
+        if (!user || !user.isActive || !user.totpSecret) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
+        if (!verifyTotp(user.totpSecret, code)) return null;
 
         await prisma.user.update({
           where: { id: user.id },
-          data: { lastLoginAt: new Date() },
+          data: { lastLoginAt: new Date(), totpEnabled: true },
         });
 
         await prisma.auditLog.create({

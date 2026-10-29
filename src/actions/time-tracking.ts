@@ -14,6 +14,20 @@ async function requireEmployee() {
   return { session, employeeId: session.user.employeeId };
 }
 
+/** True when this person still has a shift open. */
+export async function hasOpenShift(): Promise<boolean> {
+  try {
+    const { employeeId } = await requireEmployee();
+    const open = await prisma.clockEntry.findFirst({
+      where: { employeeId, clockOut: null },
+      select: { id: true },
+    });
+    return Boolean(open);
+  } catch {
+    return false;
+  }
+}
+
 /** Check the signed-in person's overtime. Clocks them out at 2 hours over. */
 export async function watchOvertime(): Promise<{ clockedOut: boolean; watching: boolean }> {
   try {

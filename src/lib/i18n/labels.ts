@@ -6,6 +6,7 @@ const LEAVE_KIND: Record<string, MessageKey> = {
   PERSONAL: "leave.kind.PERSONAL",
   HALF_DAY: "leave.kind.HALF_DAY",
   WORK_FROM_HOME: "leave.kind.WORK_FROM_HOME",
+  OUT_OF_OFFICE: "leave.kind.OUT_OF_OFFICE",
 };
 
 const LEAVE_STATUS: Record<string, MessageKey> = {
@@ -46,7 +47,7 @@ export function taskPriorityKey(priority: string): MessageKey | null {
 }
 
 export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"] as const;
-export const LEAVE_KINDS = ["VACATION", "SICK", "PERSONAL", "WORK_FROM_HOME"] as const;
+export const LEAVE_KINDS = ["VACATION", "SICK", "PERSONAL", "WORK_FROM_HOME", "OUT_OF_OFFICE"] as const;
 
 export function leavePartKey(dayPart: string | null | undefined): MessageKey | null {
   if (dayPart === "MORNING") return "leave.part.morning";

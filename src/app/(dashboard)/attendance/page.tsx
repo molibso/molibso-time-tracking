@@ -12,15 +12,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { formatDate, formatDuration } from "@/lib/utils";
 import { FULL_DAY_SECONDS, balanceSeconds, formatBalance } from "@/lib/day-balance";
+import { dateKey, outOfOfficeContext, topUpSeconds } from "@/lib/out-of-office";
 import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { translate } from "@/lib/i18n/messages";
-
-function calendarDateKey(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
 
 export default async function AttendancePage({
   searchParams,
@@ -49,7 +44,7 @@ export default async function AttendancePage({
   const yearStart = new Date(new Date().getFullYear(), 0, 1);
   const yearEnd = new Date(new Date().getFullYear(), 11, 31);
 
-  const [attendances, pendingCorrections] = await Promise.all([
+  const [attendances, pendingCorrections, office, openShift] = await Promise.all([
     prisma.attendance.findMany({
       where: { employeeId, date: { gte: yearStart, lte: yearEnd } },
       include: { clockEntries: { include: { breaks: true } } },
@@ -62,13 +57,29 @@ export default async function AttendancePage({
           orderBy: { createdAt: "asc" },
         })
       : Promise.resolve([]),
+    outOfOfficeContext(employeeId, yearStart, yearEnd),
+    prisma.clockEntry.findFirst({ where: { employeeId, clockOut: null }, select: { id: true } }),
   ]);
 
-  const days: AttendanceDay[] = attendances.map((a) => ({
-    date: calendarDateKey(a.date),
-    status: a.status as AttendanceDay["status"],
-    workedSeconds: a.clockEntries.length > 0 ? sumWorkedSeconds(a.clockEntries) : Math.max(0, a.totalWorkedMinutes) * 60,
-  }));
+  const todayKey = dateKey(new Date());
+  const days: AttendanceDay[] = attendances.map((a) => {
+    const key = dateKey(a.date);
+    const clocked = a.clockEntries.length > 0 ? sumWorkedSeconds(a.clockEntries) : Math.max(0, a.totalWorkedMinutes) * 60;
+    const credit = office.days.has(key) && !(key === todayKey && openShift);
+    return {
+      date: key,
+      status: a.status as AttendanceDay["status"],
+      workedSeconds: clocked + topUpSeconds(clocked, office.dailySeconds, credit),
+    };
+  });
+  for (const key of office.days) {
+    if (key > todayKey || days.some((day) => day.date === key)) continue;
+    days.push({
+      date: key,
+      status: "PRESENT",
+      workedSeconds: key === todayKey && openShift ? 0 : office.dailySeconds,
+    });
+  }
 
   const corrections: PendingCorrection[] = pendingCorrections.map((c) => ({
     id: c.id,
@@ -133,7 +144,9 @@ export default async function AttendancePage({
               </TableHeader>
               <TableBody>
                 {recentWithHours.map((a) => {
-                  const workedSeconds = a.clockEntries.length > 0 ? sumWorkedSeconds(a.clockEntries) : Math.max(0, a.totalWorkedMinutes) * 60;
+                  const clocked = a.clockEntries.length > 0 ? sumWorkedSeconds(a.clockEntries) : Math.max(0, a.totalWorkedMinutes) * 60;
+                  const key = dateKey(a.date);
+                  const workedSeconds = clocked + topUpSeconds(clocked, office.dailySeconds, office.days.has(key) && !(key === todayKey && openShift));
                   const breakSeconds = a.clockEntries.length > 0 ? sumBreakSeconds(a.clockEntries) : Math.max(0, a.breakMinutes) * 60;
                   return (
                   <TableRow key={a.id}>

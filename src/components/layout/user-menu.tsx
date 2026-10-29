@@ -1,8 +1,8 @@
 "use client";
 
 import { Role } from "@prisma/client";
-import { signOut } from "next-auth/react";
 import { LogOut, User as UserIcon, Settings } from "lucide-react";
+import { SignOutDialog, useSignOutChoice } from "@/components/layout/sign-out-dialog";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -31,9 +31,11 @@ export function UserMenu({
   const [first, ...rest] = name.split(" ");
   const last = rest.join(" ") || first;
   const { t } = useLocale();
+  const signOutChoice = useSignOutChoice();
   const roleLabel = t(effectiveRole(role as Role) === "ADMIN" ? "role.boss" : "role.employee");
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover">
@@ -66,10 +68,18 @@ export function UserMenu({
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })} className="text-danger">
+        <DropdownMenuItem onClick={() => void signOutChoice.request()} className="text-danger">
           <LogOut className="h-4 w-4" /> {t("common.signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <SignOutDialog
+      open={signOutChoice.open}
+      pending={signOutChoice.pending}
+      onOpenChange={signOutChoice.setOpen}
+      onClockOut={() => void signOutChoice.clockOutAndLeave()}
+      onLeaveOnly={() => void signOutChoice.leaveOnly()}
+    />
+    </>
   );
 }

@@ -4,9 +4,43 @@ import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sendEmail, passwordResetEmail } from "@/lib/email";
-import { forgotPasswordSchema, resetPasswordSchema } from "@/lib/validations/auth";
+import { loginSchema, forgotPasswordSchema, resetPasswordSchema } from "@/lib/validations/auth";
+import { createTotpSecret, totpQrDataUrl } from "@/lib/totp";
 
 export type ActionResult = { success: true; message?: string } | { success: false; error: string };
+
+export type SignInStep =
+  | { ok: true; step: "setup"; qrDataUrl: string; secret: string }
+  | { ok: true; step: "code" }
+  | { ok: false; error: string };
+
+/** Check the password, then ask for an authenticator code. The first visit prepares the QR code. */
+export async function beginSignIn(input: unknown): Promise<SignInStep> {
+  const parsed = loginSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+
+  const email = parsed.data.email.toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !user.isActive) return { ok: false, error: "invalid" };
+
+  const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
+  if (!valid) return { ok: false, error: "invalid" };
+
+  if (user.totpEnabled && user.totpSecret) return { ok: true, step: "code" };
+
+  const secret = createTotpSecret();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { totpSecret: secret, totpEnabled: false },
+  });
+
+  return {
+    ok: true,
+    step: "setup",
+    secret,
+    qrDataUrl: await totpQrDataUrl(secret, email),
+  };
+}
 
 export async function requestPasswordReset(input: unknown): Promise<ActionResult> {
   const parsed = forgotPasswordSchema.safeParse(input);

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { signApiToken } from "@/lib/api/jwt";
+import { verifyTotp } from "@/lib/totp";
 import { fail, ok, serverError } from "@/lib/api/response";
 
 /** POST /api/v1/auth/login — exchange email/password for a Bearer API token. */
@@ -23,6 +24,11 @@ export async function POST(req: NextRequest) {
     if (!user || !user.isActive) return fail("Incorrect email or password.", 401);
     const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
     if (!valid) return fail("Incorrect email or password.", 401);
+    if (!user.totpEnabled || !user.totpSecret) {
+      return fail("Set up two-factor sign-in in the browser first.", 403);
+    }
+    const code = typeof body.code === "string" ? body.code : "";
+    if (!verifyTotp(user.totpSecret, code)) return fail("That authenticator code is not valid.", 401);
 
     await prisma.user.update({
       where: { id: user.id },

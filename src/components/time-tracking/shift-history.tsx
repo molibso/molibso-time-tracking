@@ -17,6 +17,7 @@ type ShiftDay = {
   id: string;
   date: Date;
   clockEntries: ShiftEntry[];
+  creditedSeconds?: number;
 };
 
 function dayLabel(date: Date, locale: Locale): string {
@@ -85,7 +86,9 @@ export function ShiftHistory({
     }
 
     const entries = [...day.clockEntries].sort((a, b) => a.clockIn.getTime() - b.clockIn.getTime());
-    const worked = sumWorkedSeconds(entries);
+    const clocked = sumWorkedSeconds(entries);
+    const open = entries.some((entry) => !entry.clockOut);
+    const worked = open ? clocked : Math.max(clocked, day.creditedSeconds ?? 0);
     const breakSeconds = sumBreakSeconds(entries);
     month.worked += worked;
     week.worked += worked;
@@ -142,9 +145,11 @@ export function ShiftHistory({
                       <div>
                         <p className="font-medium">{day.label}</p>
                         <p className="text-xs text-muted-foreground">
-                          {day.sessions.length === 1
-                            ? translate(locale, "shifts.oneSession")
-                            : translate(locale, "shifts.sessions", { count: day.sessions.length })}
+                          {day.sessions.length === 0 && day.worked > 0
+                            ? translate(locale, "leave.kind.OUT_OF_OFFICE")
+                            : day.sessions.length === 1
+                              ? translate(locale, "shifts.oneSession")
+                              : translate(locale, "shifts.sessions", { count: day.sessions.length })}
                           {day.breakSeconds > 0 ? ` · ${translate(locale, "shifts.break", { time: formatDuration(day.breakSeconds) })}` : ""}
                         </p>
                       </div>
@@ -153,7 +158,9 @@ export function ShiftHistory({
                         {day.worked > 0 && day.balance !== 0 && (
                           <Badge variant={day.balance > 0 ? "success" : "danger"}>{formatBalance(day.balance)}</Badge>
                         )}
-                        {isSelf && <CorrectionRequestDialog attendanceId={day.id} date={day.dateLabel} />}
+                        {isSelf && !day.id.startsWith("ooo-") && (
+                          <CorrectionRequestDialog attendanceId={day.id} date={day.dateLabel} />
+                        )}
                       </div>
                     </div>
                     {day.sessions.length > 0 && (

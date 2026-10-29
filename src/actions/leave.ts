@@ -92,7 +92,7 @@ export async function reviewLeaveRequest(input: unknown): Promise<ActionResult> 
           userId: leave.employee.userId,
           type: leave.status === "APPROVED" ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
           title: leave.status === "APPROVED" ? "Leave request approved" : "Leave request rejected",
-          message: `Your ${leave.type.toLowerCase().replace("_", " ")} request for ${leave.totalDays} day(s) was ${leave.status.toLowerCase()}.`,
+          message: `Your ${leave.type.toLowerCase().replaceAll("_", " ")} request for ${leave.totalDays} day(s) was ${leave.status.toLowerCase()}.`,
           link: "/leave",
         },
       });

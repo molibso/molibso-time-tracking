@@ -65,6 +65,7 @@ enum LeaveType {
   PERSONAL
   HALF_DAY
   WORK_FROM_HOME
+  OUT_OF_OFFICE
 }
 
 enum LeaveStatus {
@@ -139,6 +140,8 @@ model User {
   image             String?
   isActive          Boolean   @default(true)
   lastLoginAt       DateTime?
+  totpSecret        String?
+  totpEnabled       Boolean   @default(false)
 
   employee          Employee?
 

@@ -100,6 +100,7 @@ export function LeaveRequestDialog() {
               )}
             />
             {errors.type && <p className="text-xs text-danger">{errors.type.message}</p>}
+            {leaveType === "OUT_OF_OFFICE" && <p className="text-xs text-muted-foreground">{t("leave.oooHint")}</p>}
           </div>
 
           {leaveType === "VACATION" && (

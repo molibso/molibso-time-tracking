@@ -15,6 +15,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { translate } from "@/lib/i18n/messages";
 import { balanceSeconds, formatBalance } from "@/lib/day-balance";
+import { dateKey, outOfOfficeContext } from "@/lib/out-of-office";
 import { sumWorkedSeconds } from "@/lib/worked-time";
 
 export default async function TimeTrackingPage({
@@ -39,7 +40,7 @@ export default async function TimeTrackingPage({
 
   const employeeId = view.viewedEmployeeId;
 
-  const [clockStatus, attendances, worked, vacation, targets] = await Promise.all([
+  const [clockStatus, attendances, worked, vacation, targets, office] = await Promise.all([
     getClockStatus(employeeId),
     prisma.attendance.findMany({
       where: { employeeId, date: { gte: range.from, lte: range.to } },
@@ -49,17 +50,43 @@ export default async function TimeTrackingPage({
     getTodayWorkedBreakdown(employeeId),
     getVacationBalance(employeeId),
     getExpectedWorkTargets(employeeId),
+    outOfOfficeContext(employeeId, range.from, range.to),
   ]);
 
-  const rangeBalance = attendances.reduce((sum, day) => {
-    const worked = day.clockEntries.length > 0 ? sumWorkedSeconds(day.clockEntries) : Math.max(0, day.totalWorkedMinutes) * 60;
-    if (worked <= 0) return sum;
-    return sum + balanceSeconds(worked);
+  const todayKey = dateKey(new Date());
+  const clockedInToday = clockStatus.status !== "OFFLINE";
+  const historyDays = attendances.map((day) => {
+    const key = dateKey(day.date);
+    const credit = office.days.has(key) && !(key === todayKey && clockedInToday);
+    return {
+      id: day.id,
+      date: day.date,
+      clockEntries: day.clockEntries,
+      creditedSeconds: credit ? office.dailySeconds : 0,
+    };
+  });
+  for (const key of office.days) {
+    if (key > todayKey || historyDays.some((day) => dateKey(day.date) === key)) continue;
+    const [year, month, day] = key.split("-").map(Number);
+    historyDays.push({
+      id: `ooo-${key}`,
+      date: new Date(year, month - 1, day),
+      clockEntries: [],
+      creditedSeconds: key === todayKey && clockedInToday ? 0 : office.dailySeconds,
+    });
+  }
+
+  const dayWorked = (day: (typeof historyDays)[number]) => {
+    const clocked = day.clockEntries.length > 0 ? sumWorkedSeconds(day.clockEntries) : 0;
+    const open = day.clockEntries.some((entry) => !entry.clockOut);
+    return open ? clocked : Math.max(clocked, day.creditedSeconds);
+  };
+  const rangeBalance = historyDays.reduce((sum, day) => {
+    const seconds = dayWorked(day);
+    if (seconds <= 0) return sum;
+    return sum + balanceSeconds(seconds);
   }, 0);
-  const workedDays = attendances.filter((day) => {
-    const worked = day.clockEntries.length > 0 ? sumWorkedSeconds(day.clockEntries) : day.totalWorkedMinutes;
-    return worked > 0;
-  }).length;
+  const workedDays = historyDays.filter((day) => dayWorked(day) > 0).length;
 
   return (
     <div className="space-y-6">
@@ -132,7 +159,7 @@ export default async function TimeTrackingPage({
           >
             {workedDays === 0 ? "N/A" : formatBalance(rangeBalance)}
           </p>
-          <ShiftHistory days={attendances} isSelf={view.isSelf} period={range.period} locale={locale} />
+          <ShiftHistory days={historyDays} isSelf={view.isSelf} period={range.period} locale={locale} />
         </CardContent>
       </Card>
     </div>
