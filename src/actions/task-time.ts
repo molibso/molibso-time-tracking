@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { TaskStatus } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/rbac";
 import { secondsBetween } from "@/lib/utils";
 import type { ActionResult } from "./auth";
 
@@ -34,7 +35,7 @@ function refreshTracked() {
   revalidatePath("/tasks");
 }
 
-async function assertCanTrackTask(taskId: string, employeeId: string) {
+async function assertCanTrackTask(taskId: string, employeeId: string, admin: boolean) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     select: {
@@ -47,7 +48,7 @@ async function assertCanTrackTask(taskId: string, employeeId: string) {
   if (!task) throw new Error("Task not found.");
   const assigned =
     task.assigneeId === employeeId || task.assignments.some((assignment) => assignment.employeeId === employeeId);
-  if (!assigned) {
+  if (!admin && !assigned) {
     throw new Error("You can only track time on tasks assigned to you.");
   }
   if (task.status === TaskStatus.DONE) {
@@ -58,8 +59,8 @@ async function assertCanTrackTask(taskId: string, employeeId: string) {
 
 export async function startTaskTimer(taskId: string): Promise<ActionResult & { stoppedEntryId?: string }> {
   try {
-    const { employeeId } = await requireEmployee();
-    const task = await assertCanTrackTask(taskId, employeeId);
+    const { session, employeeId } = await requireEmployee();
+    const task = await assertCanTrackTask(taskId, employeeId, isAdmin(session.user.role));
 
     const existing = await prisma.taskTimeEntry.findFirst({
       where: { employeeId, taskId, endedAt: null },

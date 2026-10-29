@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/i18n/app-toast";
-import { Clock, ListTodo, StickyNote } from "lucide-react";
+import { Clock, ListTodo } from "lucide-react";
 import { TaskPriority } from "@prisma/client";
 import { updateTaskStatus } from "@/actions/tasks";
 import { SubtaskFormDialog } from "@/components/tasks/subtask-form-dialog";
@@ -275,47 +275,6 @@ export function TaskDetailDialog({
                     {entry.canCorrect && entry.durationSeconds != null && (
                       <TimeCorrectionForm entryId={entry.id} durationSeconds={entry.durationSeconds} />
                     )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="space-y-3">
-            <h3 className="flex items-center gap-2 text-sm font-semibold">
-              <StickyNote className="h-4 w-4 text-muted-foreground" />
-              {t("tasks.notes")}
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal tabular-nums text-muted-foreground">
-                {task.notes.length}
-              </span>
-            </h3>
-
-            {task.notes.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                {t("tasks.noDetails")}
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {task.notes.map((entry) => (
-                  <li
-                    key={entry.id}
-                    className="rounded-xl border border-border border-l-4 border-l-petrol/50 bg-surface px-4 py-3"
-                  >
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="tabular-nums">{formatDate(entry.startedAt, locale)}</span>
-                      {entry.durationSeconds != null && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 tabular-nums">
-                          <Clock className="h-3 w-3" />
-                          {formatDuration(entry.durationSeconds)}
-                        </span>
-                      )}
-                      {entry.subtaskTitle && (
-                        <span className="rounded-full bg-petrol/10 px-2 py-0.5 text-petrol">
-                          {entry.subtaskTitle}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm leading-relaxed text-foreground">{entry.note}</p>
                   </li>
                 ))}
               </ul>

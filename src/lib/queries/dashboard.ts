@@ -315,7 +315,11 @@ export async function getUpcomingLeave(opts: {
   let where: Record<string, unknown>;
 
   const upcoming = {
-    status: { in: [LeaveStatus.APPROVED, LeaveStatus.PENDING, LeaveStatus.REJECTED] },
+    status: {
+      in: opts.teamWide
+        ? [LeaveStatus.APPROVED]
+        : [LeaveStatus.APPROVED, LeaveStatus.PENDING, LeaveStatus.REJECTED],
+    },
     endDate: { gte: startOfDay(new Date()) },
   };
 

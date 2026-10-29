@@ -150,12 +150,14 @@ export default async function TasksPage() {
     projectId: t.projectId,
     projectName: t.project?.name ?? null,
     assigneeName: namesOf(t),
-    loggedSeconds: loggedByTask.get(t.id) ?? 0,
+    loggedSeconds:
+      (loggedByTask.get(t.id) ?? 0) +
+      t.subtasks.reduce((sum, subtask) => sum + (loggedByTask.get(subtask.id) ?? 0), 0),
     isTimerActive: activeTimer?.taskId === t.id,
     timerStartedAt: activeTimer?.taskId === t.id ? activeTimer.startedAt.toISOString() : null,
     canEdit: true,
     canDelete: true,
-    canTrackTime: assignedTo(t, employeeId) && t.status !== "DONE",
+    canTrackTime: (admin || assignedTo(t, employeeId)) && t.status !== "DONE",
     notes: sessions
       .filter((entry) => entry.note)
       .map((entry) => ({
@@ -178,7 +180,7 @@ export default async function TasksPage() {
       loggedSeconds: loggedByTask.get(subtask.id) ?? 0,
       isTimerActive: activeTimer?.taskId === subtask.id,
       timerStartedAt: activeTimer?.taskId === subtask.id ? activeTimer.startedAt.toISOString() : null,
-      canTrackTime: assignedTo(subtask, employeeId) && subtask.status !== "DONE",
+      canTrackTime: (admin || assignedTo(subtask, employeeId)) && subtask.status !== "DONE",
       canEdit: true,
     })),
     };
