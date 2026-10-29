@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Trash2 } from "lucide-react";
 import { updateTaskStatus, deleteTask } from "@/actions/tasks";
 import { stopTaskTimer } from "@/actions/task-time";

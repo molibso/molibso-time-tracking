@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const canViewTeam = hasPermission(user.role, "EMPLOYEE_VIEW_ALL");
     const canApprove = hasPermission(user.role, "LEAVE_APPROVE");
 
-    const [clockStatus, hours, chartData, vacation, team, leave, pendingLeave, pendingCorrections] =
+    const [clockStatus, hours, chartData, vacation, team, leave, pendingLeave, pendingCorrections, pendingClaims] =
       await Promise.all([
         getClockStatus(user.employeeId),
         getDashboardHours(user.employeeId),
@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
         canApprove
           ? prisma.correctionRequest.count({ where: { status: "PENDING" } })
           : Promise.resolve(0),
+        canApprove ? prisma.expenseClaim.count({ where: { status: "PENDING" } }) : Promise.resolve(0),
       ]);
 
     return ok({
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
         employeeName: `${l.employee.firstName} ${l.employee.lastName}`,
       })),
       pendingApprovals: canApprove
-        ? { leave: pendingLeave, corrections: pendingCorrections }
+        ? { leave: pendingLeave, corrections: pendingCorrections, claims: pendingClaims }
         : null,
     });
   } catch (err) {

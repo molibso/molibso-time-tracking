@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { ChevronDown, Search } from "lucide-react";
+import { toast } from "@/lib/i18n/app-toast";
+import { ChevronDown, GripVertical, Search } from "lucide-react";
 import { updateTaskStatus } from "@/actions/tasks";
 import { ProjectEditButton } from "@/components/tasks/project-form-dialog";
 import { TaskDetailDialog } from "@/components/tasks/task-detail-dialog";
@@ -265,7 +265,15 @@ function ProjectWorkspace({
   onStatus: (id: string, status: string) => void;
 }) {
   const { t } = useLocale();
+  const [overStatus, setOverStatus] = useState<string | null>(null);
   const done = tasks.filter((task) => task.status === "DONE").length;
+
+  function dropOn(taskId: string, status: string) {
+    setOverStatus(null);
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task || !task.canEdit || task.status === status) return;
+    onStatus(taskId, status);
+  }
 
   return (
     <div>
@@ -295,21 +303,20 @@ function ProjectWorkspace({
         <p className="px-4 py-10 text-sm text-muted-foreground">{t("tasks.noMatch")}</p>
       ) : (
         <div>
-          {TASK_STATUSES.map((status) => {
-            const group = tasks.filter((task) => task.status === status);
-            if (group.length === 0) return null;
-            return (
-              <StatusGroup
-                key={status}
-                status={status}
-                tasks={group}
-                locale={locale}
-                isPending={isPending}
-                onOpen={onOpen}
-                onStatus={onStatus}
-              />
-            );
-          })}
+          {TASK_STATUSES.map((status) => (
+            <StatusGroup
+              key={status}
+              status={status}
+              tasks={tasks.filter((task) => task.status === status)}
+              locale={locale}
+              isPending={isPending}
+              over={overStatus === status}
+              onOver={() => setOverStatus(status)}
+              onDropTask={dropOn}
+              onOpen={onOpen}
+              onStatus={onStatus}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -321,6 +328,9 @@ function StatusGroup({
   tasks,
   locale,
   isPending,
+  over,
+  onOver,
+  onDropTask,
   onOpen,
   onStatus,
 }: {
@@ -328,6 +338,9 @@ function StatusGroup({
   tasks: TaskRow[];
   locale: Locale;
   isPending: boolean;
+  over: boolean;
+  onOver: () => void;
+  onDropTask: (id: string, status: string) => void;
   onOpen: (id: string) => void;
   onStatus: (id: string, status: string) => void;
 }) {
@@ -336,7 +349,19 @@ function StatusGroup({
   const labelKey = taskStatusKey(status);
 
   return (
-    <section className="border-b border-border last:border-b-0">
+    <section
+      className={cn("border-b border-border last:border-b-0", over && "bg-petrol/5")}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setOpen(true);
+        onOver();
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        const taskId = event.dataTransfer.getData("text/task-id");
+        if (taskId) onDropTask(taskId, status);
+      }}
+    >
       <button
         type="button"
         className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-muted/40"
@@ -349,6 +374,9 @@ function StatusGroup({
       </button>
       {open && (
         <ul>
+          {tasks.length === 0 && (
+            <li className="border-t border-dashed border-border px-4 py-3 text-xs text-muted-foreground">{t("tasks.boardEmpty")}</li>
+          )}
           {tasks.map((task) => (
             <TaskLine
               key={task.id}
@@ -382,7 +410,19 @@ function TaskLine({
   const priorityKey = taskPriorityKey(task.priority);
   const overdue = task.dueDate ? isOverdue(task.dueDate, task.status) : false;
   return (
-    <li className="flex flex-wrap items-center gap-3 border-t border-border/70 px-4 py-2.5 hover:bg-muted/30">
+    <li
+      className="flex flex-wrap items-center gap-3 border-t border-border/70 px-4 py-2.5 hover:bg-muted/30"
+      draggable={task.canEdit && !isPending}
+      onDragStart={(event) => {
+        if (!task.canEdit) {
+          event.preventDefault();
+          return;
+        }
+        event.dataTransfer.setData("text/task-id", task.id);
+        event.dataTransfer.effectAllowed = "move";
+      }}
+    >
+      {task.canEdit && <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" aria-hidden />}
       <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => onOpen(task.id)}>
         <span
           className={cn(

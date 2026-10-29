@@ -48,7 +48,7 @@ export async function notifyAdminsOfOvertime(opts: {
           type: NotificationType.OVERTIME_ALERT,
           link,
           createdAt: { gte: dayStart },
-          title: { contains: name },
+          title: `Overtime alert — ${name}`,
         },
       });
       if (existing) return;
@@ -63,6 +63,143 @@ export async function notifyAdminsOfOvertime(opts: {
         },
       });
     }),
+  );
+}
+
+/** Warn the person once they pass 1 hour of overtime, before the shift is stopped. */
+export async function notifyEmployeeOfOvertime(opts: { employeeId: string; at: Date }) {
+  const settings = await prisma.companySettings.findUnique({
+    where: { id: "global" },
+    select: { notifyOvertimeAlert: true },
+  });
+  if (settings && !settings.notifyOvertimeAlert) return;
+
+  const employee = await prisma.employee.findUnique({
+    where: { id: opts.employeeId },
+    select: { userId: true },
+  });
+  if (!employee) return;
+
+  const dayStart = startOfDay(opts.at);
+  const existing = await prisma.notification.findFirst({
+    where: {
+      userId: employee.userId,
+      type: NotificationType.OVERTIME_ALERT,
+      title: "Overtime warning",
+      createdAt: { gte: dayStart },
+    },
+  });
+  if (existing) return;
+
+  await prisma.notification.create({
+    data: {
+      userId: employee.userId,
+      type: NotificationType.OVERTIME_ALERT,
+      title: "Overtime warning",
+      message: "You have more than 1 hour of overtime. You will be clocked out at 2 hours.",
+      link: "/time-tracking",
+    },
+  });
+}
+
+/** Tell admins the shift was stopped at 2 hours of overtime. */
+export async function notifyAdminsOfForcedClockOut(opts: { employeeId: string; at: Date }) {
+  const settings = await prisma.companySettings.findUnique({
+    where: { id: "global" },
+    select: { notifyOvertimeAlert: true },
+  });
+  if (settings && !settings.notifyOvertimeAlert) return;
+
+  const employee = await prisma.employee.findUnique({
+    where: { id: opts.employeeId },
+    select: { firstName: true, lastName: true },
+  });
+  if (!employee) return;
+
+  const name = `${employee.firstName} ${employee.lastName}`;
+  const title = `Clocked out — ${name}`;
+  const link = `/attendance?employeeId=${opts.employeeId}`;
+  const dayStart = startOfDay(opts.at);
+
+  const admins = await prisma.user.findMany({
+    where: { isActive: true, role: { in: [Role.ADMIN, Role.MANAGER] } },
+    select: { id: true },
+  });
+
+  await Promise.all(
+    admins.map(async (admin) => {
+      const existing = await prisma.notification.findFirst({
+        where: {
+          userId: admin.id,
+          type: NotificationType.OVERTIME_ALERT,
+          title,
+          createdAt: { gte: dayStart },
+        },
+      });
+      if (existing) return;
+
+      await prisma.notification.create({
+        data: {
+          userId: admin.id,
+          type: NotificationType.OVERTIME_ALERT,
+          title,
+          message: `${name} was clocked out after 2 hours of overtime.`,
+          link,
+        },
+      });
+    }),
+  );
+}
+
+/** One notification per person, per title, per day. */
+export async function notifyOnceToday(opts: {
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link: string;
+  at?: Date;
+}) {
+  const dayStart = startOfDay(opts.at ?? new Date());
+  const existing = await prisma.notification.findFirst({
+    where: {
+      userId: opts.userId,
+      type: opts.type,
+      title: opts.title,
+      createdAt: { gte: dayStart },
+    },
+  });
+  if (existing) return;
+
+  await prisma.notification.create({
+    data: {
+      userId: opts.userId,
+      type: opts.type,
+      title: opts.title,
+      message: opts.message,
+      link: opts.link,
+    },
+  });
+}
+
+/** Tell every boss that an expense claim is waiting. */
+export async function notifyAdminsOfExpenseClaim(opts: { employeeName: string; destination: string }) {
+  const admins = await prisma.user.findMany({
+    where: { isActive: true, role: { in: [Role.ADMIN, Role.MANAGER] } },
+    select: { id: true },
+  });
+  const title = `Expense claim — ${opts.employeeName}`;
+  const message = `${opts.employeeName} submitted expenses for ${opts.destination}.`;
+  await Promise.all(
+    admins.map((admin) =>
+      notifyOnceToday({
+        userId: admin.id,
+        type: NotificationType.SYSTEM,
+        title,
+        message,
+        link: "/expenses",
+      }),
+    ),
   );
 }
 

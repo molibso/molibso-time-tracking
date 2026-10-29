@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Play, Square, Coffee, CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clockIn, clockOut, startBreak, endBreak } from "@/actions/time-tracking";
@@ -47,6 +47,7 @@ export function ClockWidget({
   personLabel,
   closedSecondsToday = 0,
   closedBreakSecondsToday = 0,
+  expectedSecondsToday = FULL_DAY_SECONDS,
 }: {
   /** When true, show status only (boss viewing a teammate). */
   readOnly?: boolean;
@@ -54,6 +55,8 @@ export function ClockWidget({
   /** Finished shifts today. The open shift is added live. */
   closedSecondsToday?: number;
   closedBreakSecondsToday?: number;
+  /** Hours owed today. Vacation, a half day, and holidays already reduce this. */
+  expectedSecondsToday?: number;
 }) {
   const router = useRouter();
   const { t, locale } = useLocale();
@@ -166,6 +169,7 @@ export function ClockWidget({
               completedBreakSecondsOnOpen={session.completedBreakSecondsOnOpen}
               closedSecondsToday={closedSecondsToday}
               closedBreakSecondsToday={closedBreakSecondsToday}
+              expectedSecondsToday={expectedSecondsToday}
               locale={locale}
             />
           )}
@@ -215,6 +219,7 @@ function DayRemainder({
   completedBreakSecondsOnOpen,
   closedSecondsToday,
   closedBreakSecondsToday,
+  expectedSecondsToday,
   locale,
 }: {
   nowMs: number;
@@ -223,6 +228,7 @@ function DayRemainder({
   completedBreakSecondsOnOpen: number;
   closedSecondsToday: number;
   closedBreakSecondsToday: number;
+  expectedSecondsToday: number;
   locale: Locale;
 }) {
   const { t } = useLocale();
@@ -244,7 +250,7 @@ function DayRemainder({
 
   const worked = closedSecondsToday + openWorked;
   const breaks = closedBreakSecondsToday + openBreak;
-  const remainingWork = Math.max(0, FULL_DAY_SECONDS - worked);
+  const remainingWork = Math.max(0, expectedSecondsToday - worked);
   const remainingBreak = Math.max(0, BREAK_ALLOWANCE_SECONDS - breaks);
   const until = new Date(nowMs + (remainingWork + remainingBreak) * 1000);
   const untilLabel = until.toLocaleTimeString(intlLocale(locale), { hour: "2-digit", minute: "2-digit" });
@@ -254,5 +260,24 @@ function DayRemainder({
   else if (remainingWork === 0) text = t("clock.workDoneUntil", { until: untilLabel });
   else text = t("clock.left", { time: formatHoursLeft(remainingWork), until: untilLabel });
 
-  return <p className="mt-1 text-sm font-medium tabular-nums text-foreground">{text}</p>;
+  const overtime = worked - expectedSecondsToday;
+  const untilCap = expectedSecondsToday + 2 * 60 * 60 - worked;
+  let warning: string | null = null;
+  if (overtime > 60 * 60 && untilCap > 0) {
+    if (breakSince) warning = t("clock.overtimeWarnPaused", { time: formatHoursLeft(untilCap) });
+    else {
+      const stopAt = new Date(nowMs + untilCap * 1000).toLocaleTimeString(intlLocale(locale), {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      warning = t("clock.overtimeWarn", { until: stopAt });
+    }
+  }
+
+  return (
+    <>
+      <p className="mt-1 text-sm font-medium tabular-nums text-foreground">{text}</p>
+      {warning && <p className="mt-1 text-sm font-medium text-warning">{warning}</p>}
+    </>
+  );
 }

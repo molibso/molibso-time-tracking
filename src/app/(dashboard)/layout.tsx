@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { AccountMenu } from "@/components/layout/account-menu";
 import { NavigationPending, PendingOutlet } from "@/components/layout/navigation-pending";
+import { OvertimeWatch } from "@/components/time-tracking/overtime-watch";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function AccountFallback() {
@@ -41,6 +42,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </Suspense>
             }
           />
+          <OvertimeWatch />
           <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
             <PendingOutlet>{children}</PendingOutlet>
           </main>

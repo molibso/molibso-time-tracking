@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Play, Square } from "lucide-react";
 import { startTaskTimer, stopTaskTimer } from "@/actions/task-time";
 import { SessionNoteDialog } from "@/components/tasks/session-note-dialog";

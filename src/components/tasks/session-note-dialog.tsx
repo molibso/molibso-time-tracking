@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { saveTimeEntryNote } from "@/actions/task-time";
 import { useLocale } from "@/components/layout/locale-provider";
 import { Button } from "@/components/ui/button";

@@ -75,6 +75,7 @@ export default async function DashboardPage({
     employee,
     pendingLeave,
     pendingCorrections,
+    pendingClaims,
     employeeCount,
   ] = await Promise.all([
     getClockStatus(employeeId),
@@ -95,6 +96,7 @@ export default async function DashboardPage({
           where: { status: "PENDING", ...leaveEmployeeIdsWhere(visibleIds) },
         })
       : Promise.resolve(0),
+    canApprove ? prisma.expenseClaim.count({ where: { status: "PENDING" } }) : Promise.resolve(0),
     boss ? prisma.employee.count({ where: { status: "ACTIVE" } }) : Promise.resolve(0),
   ]);
 
@@ -132,7 +134,13 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {canApprove && <PendingActionsCard pendingLeave={pendingLeave} pendingCorrections={pendingCorrections} />}
+      {canApprove && (
+        <PendingActionsCard
+          pendingLeave={pendingLeave}
+          pendingCorrections={pendingCorrections}
+          pendingClaims={pendingClaims}
+        />
+      )}
 
       <ClockSessionProvider
         initial={{
@@ -145,6 +153,7 @@ export default async function DashboardPage({
         <ClockWidget
           closedSecondsToday={worked.closedSecondsToday}
           closedBreakSecondsToday={worked.closedBreakSecondsToday}
+          expectedSecondsToday={targets.today}
         />
 
         <WorkedHoursKpis

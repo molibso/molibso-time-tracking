@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTodayAttendance, recalculateAttendanceTotals } from "@/lib/attendance";
+import { enforceAllOpenShifts } from "@/lib/overtime-guard";
 import { correctionRequestSchema } from "@/lib/validations/leave";
 import type { ActionResult } from "./auth";
 
@@ -11,6 +12,17 @@ async function requireEmployee() {
   const session = await auth();
   if (!session?.user.employeeId) throw new Error("No employee profile linked to this account.");
   return { session, employeeId: session.user.employeeId };
+}
+
+/** Check the signed-in person's overtime. Clocks them out at 2 hours over. */
+export async function watchOvertime(): Promise<{ clockedOut: boolean; watching: boolean }> {
+  try {
+    const session = await auth();
+    if (!session?.user.employeeId) return { clockedOut: false, watching: false };
+    return await enforceAllOpenShifts(session.user.employeeId);
+  } catch {
+    return { clockedOut: false, watching: false };
+  }
 }
 
 export async function clockIn(): Promise<ActionResult> {

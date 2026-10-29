@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 const OPTIONS: { id: Locale; labelKey: MessageKey }[] = [
   { id: "en", labelKey: "common.english" },
   { id: "de", labelKey: "common.german" },
-  { id: "fr", labelKey: "common.french" },
 ];
 
 export function LanguageToggle() {

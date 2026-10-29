@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Clock, ListTodo, StickyNote } from "lucide-react";
 import { TaskPriority } from "@prisma/client";
 import { updateTaskStatus } from "@/actions/tasks";

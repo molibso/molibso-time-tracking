@@ -89,6 +89,7 @@ export default async function TimeTrackingPage({
           personLabel={view.isSelf ? undefined : view.viewedName}
           closedSecondsToday={worked.closedSecondsToday}
           closedBreakSecondsToday={worked.closedBreakSecondsToday}
+          expectedSecondsToday={targets.today}
         />
 
         <WorkedHoursKpis

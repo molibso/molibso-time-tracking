@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notifyAdminsOfOvertime } from "@/lib/notifications";
+import { getExpectedWorkTargets } from "@/lib/queries/dashboard";
 import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
 
 export async function getOrCreateTodayAttendance(employeeId: string) {
@@ -13,9 +14,6 @@ export async function getOrCreateTodayAttendance(employeeId: string) {
 }
 
 export async function recalculateAttendanceTotals(attendanceId: string) {
-  const settings = await prisma.companySettings.findUnique({ where: { id: "global" } });
-  const overtimeThresholdMinutes = (settings?.overtimeThresholdDaily ?? 8) * 60;
-
   const attendance = await prisma.attendance.findUnique({
     where: { id: attendanceId },
     select: { employeeId: true },
@@ -33,21 +31,22 @@ export async function recalculateAttendanceTotals(attendanceId: string) {
 
   const workedMinutes = Math.round(workedSeconds / 60);
   const breakMinutes = Math.round(breakSeconds / 60);
-  const overtimeMinutes = Math.max(0, workedMinutes - overtimeThresholdMinutes);
+  const expectedToday = (await getExpectedWorkTargets(attendance.employeeId)).today;
+  const owedOvertimeMinutes = Math.max(0, workedMinutes - Math.round(expectedToday / 60));
 
   const updated = await prisma.attendance.update({
     where: { id: attendanceId },
     data: {
       totalWorkedMinutes: Math.max(0, workedMinutes),
       breakMinutes,
-      overtimeMinutes,
+      overtimeMinutes: owedOvertimeMinutes,
     },
   });
 
   await notifyAdminsOfOvertime({
     attendanceId,
     employeeId: attendance.employeeId,
-    overtimeMinutes,
+    overtimeMinutes: owedOvertimeMinutes,
   });
 
   return updated;

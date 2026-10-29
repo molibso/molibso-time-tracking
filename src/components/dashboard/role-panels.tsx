@@ -13,11 +13,13 @@ import { ClipboardCheck, Users, Settings, BarChart3 } from "lucide-react";
 export function PendingActionsCard({
   pendingLeave,
   pendingCorrections,
+  pendingClaims,
 }: {
   pendingLeave: number;
   pendingCorrections: number;
+  pendingClaims: number;
 }) {
-  const total = pendingLeave + pendingCorrections;
+  const total = pendingLeave + pendingCorrections + pendingClaims;
   const { t } = useLocale();
   if (total === 0) return null;
 
@@ -44,6 +46,13 @@ export function PendingActionsCard({
               {t(pendingCorrections === 1 ? "dashboard.corrections" : "dashboard.correctionsPlural", {
                 count: pendingCorrections,
               })}
+            </Link>
+          </Button>
+        )}
+        {pendingClaims > 0 && (
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/expenses">
+              {t(pendingClaims === 1 ? "dashboard.claims" : "dashboard.claimsPlural", { count: pendingClaims })}
             </Link>
           </Button>
         )}

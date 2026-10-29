@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { markNotificationRead, markAllNotificationsRead } from "@/actions/notifications";
+import { listMyNotifications, markNotificationRead, markAllNotificationsRead } from "@/actions/notifications";
 import { useLocale } from "@/components/layout/locale-provider";
 import { localizeNotification } from "@/lib/i18n/notification-text";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,18 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
   const { locale, t } = useLocale();
   const [items, setItems] = useState(notifications);
   const unreadCount = items.filter((n) => !n.isRead).length;
+
+  useEffect(() => {
+    setItems(notifications);
+  }, [notifications]);
+
+  useEffect(() => {
+    const id = setInterval(async () => {
+      const next = await listMyNotifications();
+      setItems(next);
+    }, 20_000);
+    return () => clearInterval(id);
+  }, []);
 
   async function handleOpenItem(id: string) {
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));

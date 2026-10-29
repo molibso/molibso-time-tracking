@@ -87,15 +87,15 @@ export function WorkedHoursKpis({
   const weekSeconds = closedSecondsWeek + shown;
   const monthSeconds = closedSecondsMonth + shown;
 
-  const today = workedAgainst(todaySeconds, targetToday);
-  const week = workedAgainst(weekSeconds, targetWeek);
-  const month = workedAgainst(monthSeconds, targetMonth);
+  const today = workedAgainst(todaySeconds, targetToday, t("kpi.expected", { time: formatWorkTarget(targetToday) }));
+  const week = workedAgainst(weekSeconds, targetWeek, t("kpi.expected", { time: formatWorkTarget(targetWeek) }));
+  const month = workedAgainst(monthSeconds, targetMonth, t("kpi.expected", { time: formatWorkTarget(targetMonth) }));
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <KpiCard label={t("kpi.today")} value={today.value} icon={Clock3} accent="primary" valueClassName={today.className} />
-      <KpiCard label={t("kpi.week")} value={week.value} icon={TrendingUp} accent="success" valueClassName={week.className} />
-      <KpiCard label={t("kpi.month")} value={month.value} icon={CalendarCheck2} accent="primary" valueClassName={month.className} />
+      <KpiCard label={t("kpi.today")} value={today.value} sublabel={today.sublabel} icon={Clock3} accent="primary" valueClassName={today.className} />
+      <KpiCard label={t("kpi.week")} value={week.value} sublabel={week.sublabel} icon={TrendingUp} accent="success" valueClassName={week.className} />
+      <KpiCard label={t("kpi.month")} value={month.value} sublabel={month.sublabel} icon={CalendarCheck2} accent="primary" valueClassName={month.className} />
       <KpiCard
         label={t("kpi.vacation")}
         value={`${vacation.remaining}d`}
@@ -107,10 +107,11 @@ export function WorkedHoursKpis({
   );
 }
 
-function workedAgainst(workedSeconds: number, targetSeconds: number) {
+function workedAgainst(workedSeconds: number, targetSeconds: number, expectedLabel: string) {
   const met = workedSeconds >= targetSeconds;
   return {
-    value: `${formatDuration(workedSeconds)} / ${formatWorkTarget(targetSeconds)}`,
+    value: formatDuration(workedSeconds),
+    sublabel: expectedLabel,
     className: cn("text-2xl leading-tight sm:text-[1.65rem]", met && "text-success"),
   };
 }

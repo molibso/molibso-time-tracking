@@ -5,6 +5,24 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "./auth";
 
+export async function listMyNotifications() {
+  const session = await auth();
+  if (!session) return [];
+  const rows = await prisma.notification.findMany({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "desc" },
+    take: 15,
+  });
+  return rows.map((n) => ({
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    isRead: n.isRead,
+    link: n.link,
+    createdAt: n.createdAt.toISOString(),
+  }));
+}
+
 export async function markNotificationRead(id: string): Promise<ActionResult> {
   const session = await auth();
   if (!session) return { success: false, error: "Not authenticated" };

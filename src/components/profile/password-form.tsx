@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Loader2 } from "lucide-react";
 import { changePasswordSchema, type ChangePasswordInput } from "@/lib/validations/employee";
 import { changeOwnPassword } from "@/actions/profile";

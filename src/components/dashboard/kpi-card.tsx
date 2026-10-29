@@ -33,7 +33,7 @@ export function KpiCard({
         </span>
       </div>
       <p className={cn("mt-4 text-3xl font-semibold tracking-tight text-foreground", valueClassName)}>{value}</p>
-      {sublabel && <p className="mt-1.5 text-xs text-muted-foreground">{sublabel}</p>}
+      {sublabel && <p className="mt-1.5 text-sm text-muted-foreground">{sublabel}</p>}
     </div>
   );
 }

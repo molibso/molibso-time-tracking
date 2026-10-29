@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Locale, type MessageKey } from "@/lib/i18n/messages";
+import { bindActionLocale } from "@/lib/i18n/app-toast";
 
 type LocaleContextValue = {
   locale: Locale;
@@ -19,6 +20,8 @@ export function LocaleProvider({ locale, children }: { locale: Locale; children:
   useEffect(() => {
     setCurrent(locale);
   }, [locale]);
+
+  bindActionLocale(current);
 
   const value = useMemo<LocaleContextValue>(
     () => ({

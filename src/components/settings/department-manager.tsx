@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Trash2, Plus, Loader2 } from "lucide-react";
 import { departmentSchema, type DepartmentInput } from "@/lib/validations/settings";
 import { createDepartment, deleteDepartment } from "@/actions/settings";

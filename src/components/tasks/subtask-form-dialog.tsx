@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Loader2, Plus } from "lucide-react";
 import { z } from "zod";
 import { TaskPriority } from "@prisma/client";
@@ -143,7 +143,7 @@ export function SubtaskFormDialog({
                 <Input
                   id={`subtask-hours-${parentId}`}
                   type="number"
-                  step="0.5"
+                  step="0.25"
                   min={0.25}
                   {...register("estimatedHours")}
                 />

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Loader2, Pencil } from "lucide-react";
 import { correctionRequestSchema, type CorrectionRequestInput } from "@/lib/validations/leave";
 import { requestCorrection } from "@/actions/time-tracking";

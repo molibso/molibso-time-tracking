@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Loader2, Plus } from "lucide-react";
 import { leaveRequestSchema, type LeaveRequestInput } from "@/lib/validations/leave";
 import { createLeaveRequest } from "@/actions/leave";

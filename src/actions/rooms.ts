@@ -74,6 +74,7 @@ export async function reserveRoom(input: {
     const endTime = combineDateAndTime(input.date, input.end);
     if (!startTime || !endTime) return { success: false, error: "Enter a valid date and time." };
     if (endTime <= startTime) return { success: false, error: "End time has to be after the start." };
+    if (startTime.getTime() < Date.now() - 60_000) return { success: false, error: "That time has already passed." };
 
     const room = await prisma.meetingRoom.findUnique({ where: { id: input.roomId } });
     if (!room) return { success: false, error: "That resource was not found." };
@@ -89,8 +90,13 @@ export async function reserveRoom(input: {
         startTime: { lt: endTime },
         endTime: { gt: startTime },
       },
+      include: { employee: true },
     });
-    if (conflict) return { success: false, error: "That slot is already booked." };
+    if (conflict) {
+      const name = `${conflict.employee.firstName} ${conflict.employee.lastName}`;
+      const until = conflict.endTime.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      return { success: false, error: `Booked by ${name} until ${until}.` };
+    }
 
     await prisma.roomReservation.create({
       data: {

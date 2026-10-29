@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Trash2, Plus, Loader2 } from "lucide-react";
 import { holidaySchema, type HolidayInput } from "@/lib/validations/settings";
 import { createHoliday, deleteHoliday } from "@/actions/settings";

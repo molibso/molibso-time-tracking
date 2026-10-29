@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cancelReservation, reserveRoom } from "@/actions/rooms";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,25 @@ export function RoomsBoard({
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const date = String(formData.get("date") ?? "");
+    const startText = String(formData.get("start") ?? "");
+    const endText = String(formData.get("end") ?? "");
+    const startMs = new Date(`${date}T${startText}`).getTime();
+    const endMs = new Date(`${date}T${endText}`).getTime();
+    if (Number.isFinite(startMs) && startMs < Date.now() - 60_000) {
+      toast.error(t("rooms.past"));
+      return;
+    }
+    const clash = reservations.find((item) => new Date(item.start).getTime() < endMs && new Date(item.end).getTime() > startMs);
+    if (clash && Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+      toast.error(
+        t("rooms.taken", {
+          name: clash.who,
+          time: new Date(clash.end).toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" }),
+        }),
+      );
+      return;
+    }
     startTransition(async () => {
       const result = await reserveRoom({
         roomId,
@@ -135,7 +154,10 @@ export function RoomsBoard({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
         <p className={cn("text-sm font-medium", current ? "text-warning" : "text-success")}>
           {current
-            ? `${t("rooms.inUse", { time: new Date(current.end).toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" }) })} · ${current.title}`
+            ? t("rooms.inUseBy", {
+                name: current.who,
+                time: new Date(current.end).toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" }),
+              })
             : t("rooms.freeNow")}
         </p>
         <div className="flex items-center gap-2">

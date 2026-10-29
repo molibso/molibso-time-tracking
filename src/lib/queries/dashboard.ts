@@ -2,7 +2,7 @@ import { LeaveType, LeaveStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ClockStatus } from "@/types/clock";
 import { sumBreakSeconds, sumWorkedSeconds } from "@/lib/worked-time";
-import { expectedWorkSeconds, type DayOff } from "@/lib/expected-hours";
+import { expectedWorkSeconds, owedSecondsOnDay, toDaysOff, type DayOff } from "@/lib/expected-hours";
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, secondsBetween } from "@/lib/utils";
 import { intlLocale, type Locale } from "@/lib/i18n/messages";
 import type { WorkedChartPoint } from "@/lib/chart-range";
@@ -246,6 +246,37 @@ export async function getTeamAvailability(opts?: { managerId?: string; all?: boo
     take: 30,
   });
 
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const todayEnd = endOfDay(now);
+  const ids = employees.map((emp) => emp.id);
+  const [dayEntries, leaves, holidays] = ids.length
+    ? await Promise.all([
+        prisma.clockEntry.findMany({
+          where: {
+            employeeId: { in: ids },
+            clockIn: { lte: now },
+            OR: [{ clockOut: null }, { clockOut: { gte: todayStart } }],
+          },
+          include: { breaks: true },
+        }),
+        prisma.leaveRequest.findMany({
+          where: {
+            employeeId: { in: ids },
+            status: LeaveStatus.APPROVED,
+            type: { in: [...FULL_DAY_OFF, LeaveType.HALF_DAY] },
+            startDate: { lte: todayEnd },
+            endDate: { gte: todayStart },
+          },
+          select: { employeeId: true, type: true, dayPart: true, startDate: true, endDate: true },
+        }),
+        prisma.holiday.findMany({
+          where: { isPaid: true, date: { lte: todayEnd } },
+          select: { date: true, endDate: true },
+        }),
+      ])
+    : [[], [], []];
+
   return employees.map((emp) => {
     const openEntry = emp.clockEntries[0];
     let status: ClockStatus = "OFFLINE";
@@ -253,6 +284,17 @@ export async function getTeamAvailability(opts?: { managerId?: string; all?: boo
       const onBreak = openEntry.breaks.some((b) => !b.endedAt);
       status = onBreak ? "ON_BREAK" : "WORKING";
     }
+    const mine = dayEntries.filter((entry) => entry.employeeId === emp.id);
+    const worked = sumWorkedSeconds(mine, { from: todayStart, to: todayEnd }, now);
+    const owed = owedSecondsOnDay(
+      emp.weeklyHours,
+      now,
+      toDaysOff(
+        leaves.filter((leave) => leave.employeeId === emp.id),
+        holidays,
+        todayStart,
+      ),
+    );
     return {
       id: emp.id,
       name: `${emp.firstName} ${emp.lastName}`,
@@ -260,6 +302,7 @@ export async function getTeamAvailability(opts?: { managerId?: string; all?: boo
       department: emp.department?.name ?? "—",
       avatarUrl: emp.avatarUrl,
       status,
+      overtime: worked - owed > 60 * 60,
     };
   });
 }

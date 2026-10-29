@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { toast } from "@/lib/i18n/app-toast";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,15 +23,17 @@ import {
 import { useLocale } from "@/components/layout/locale-provider";
 import { intlLocale, type MessageKey } from "@/lib/i18n/messages";
 import { leaveStatusKey } from "@/lib/i18n/labels";
-import { formatDate, formatDateRange } from "@/lib/utils";
-import { formatEuros } from "@/lib/expenses";
+import { calendarDate, formatDate, formatDateRange } from "@/lib/utils";
+import { formatEuros, mealAllowanceCents, mileageCents } from "@/lib/expenses";
 import {
   addExpenseLine,
   createTravelRequest,
   deleteExpenseLine,
   deleteTravelRequest,
+  updateTravelRequest,
   reviewExpenseClaim,
   submitExpenseClaim,
+  withdrawExpenseClaim,
 } from "@/actions/expenses";
 
 export type TripRow = {
@@ -104,7 +106,7 @@ export function ExpensesView({
         <p className="py-10 text-center text-sm text-muted-foreground">{t("expenses.empty")}</p>
       ) : (
         items.map((trip) => (
-          <TripCard key={trip.id} trip={trip} money={money} statusLabel={statusLabel} readOnly={readOnly} />
+          <TripCard key={trip.id} trip={trip} money={money} statusLabel={statusLabel} readOnly={readOnly} canCorrect={canApprove && readOnly} />
         ))
       )}
     </div>
@@ -212,16 +214,22 @@ function TripCard({
   money,
   statusLabel,
   readOnly,
+  canCorrect,
 }: {
   trip: TripRow;
   money: (cents: number) => string;
   statusLabel: (status: string) => string;
   readOnly: boolean;
+  canCorrect: boolean;
 }) {
   const { locale, t } = useLocale();
   const router = useRouter();
   const [pending, start] = useTransition();
+  const draftLike = !trip.claim || trip.claim.status === "DRAFT" || trip.claim.status === "REJECTED";
   const editable = !readOnly && trip.claim && (trip.claim.status === "DRAFT" || trip.claim.status === "REJECTED");
+  const canEditTrip = draftLike && (!readOnly || canCorrect);
+  const canDelete = draftLike;
+  const canWithdraw = !readOnly && trip.claim?.status === "PENDING";
   const total = trip.claim?.lines.reduce((sum, line) => sum + line.amountCents, 0) ?? 0;
 
   return (
@@ -239,6 +247,18 @@ function TripCard({
             <span className="block text-xs text-muted-foreground">{t("expenses.toReturn")}</span>
             <span className="text-lg font-semibold tabular-nums">{money(total)}</span>
           </p>
+          {canEditTrip && (
+            <TravelDialog
+              trip={{
+                id: trip.id,
+                destination: trip.destination,
+                purpose: trip.purpose,
+                startDate: trip.startDate,
+                endDate: trip.endDate,
+              }}
+            />
+          )}
+          {canDelete && (
           <Button
             size="icon"
             variant="ghost"
@@ -257,12 +277,37 @@ function TripCard({
           >
             <Trash2 className="h-4 w-4" />
           </Button>
+          )}
         </div>
       </div>
 
       {trip.claim && (
         <div className="mt-4 space-y-3 border-t border-border pt-3">
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-3">
+            {trip.claim.lines.length > 0 && (
+              <a href={`/api/expenses/export?claimId=${trip.claim.id}`} className="text-sm font-medium text-petrol hover:underline">
+                {t("expenses.download")}
+              </a>
+            )}
+            {canWithdraw && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => {
+                  if (!window.confirm(t("expenses.withdrawConfirm"))) return;
+                  start(async () => {
+                    const result = await withdrawExpenseClaim(trip.claim!.id);
+                    if (result.success) {
+                      toast.success(result.message);
+                      router.refresh();
+                    } else toast.error(result.error);
+                  });
+                }}
+              >
+                {t("expenses.withdraw")}
+              </Button>
+            )}
             <Badge variant={statusVariant(trip.claim.status)}>{statusLabel(trip.claim.status)}</Badge>
           </div>
           {trip.claim.reviewComment && <p className="text-sm text-muted-foreground">{trip.claim.reviewComment}</p>}
@@ -327,10 +372,22 @@ function TripCard({
 }
 
 function LineForm({ claimId }: { claimId: string }) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const router = useRouter();
   const [kind, setKind] = useState<"RECEIPT" | "MILEAGE" | "MEAL">("RECEIPT");
+  const [kilometers, setKilometers] = useState("");
+  const [fullDay, setFullDay] = useState(false);
+  const [breakfast, setBreakfast] = useState(false);
+  const [lunch, setLunch] = useState(false);
+  const [dinner, setDinner] = useState(false);
   const [pending, start] = useTransition();
+  const money = (cents: number) => formatEuros(cents, intlLocale(locale));
+  const preview =
+    kind === "MILEAGE"
+      ? mileageCents(Number(kilometers.replace(",", ".")) || 0)
+      : kind === "MEAL"
+        ? mealAllowanceCents({ fullDay, breakfast, lunch, dinner })
+        : null;
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -349,6 +406,11 @@ function LineForm({ claimId }: { claimId: string }) {
       if (result.success) {
         toast.success(result.message);
         form.reset();
+        setKilometers("");
+        setFullDay(false);
+        setBreakfast(false);
+        setLunch(false);
+        setDinner(false);
         router.refresh();
       } else toast.error(result.error);
     });
@@ -377,7 +439,7 @@ function LineForm({ claimId }: { claimId: string }) {
         {kind === "MILEAGE" && (
           <div className="space-y-1.5">
             <Label htmlFor={`km-${claimId}`}>{t("expenses.km")}</Label>
-            <Input id={`km-${claimId}`} name="kilometers" inputMode="decimal" required placeholder="0" />
+            <Input id={`km-${claimId}`} name="kilometers" inputMode="decimal" required placeholder="0" value={kilometers} onChange={(event) => setKilometers(event.target.value)} />
           </div>
         )}
       </div>
@@ -397,13 +459,14 @@ function LineForm({ claimId }: { claimId: string }) {
       {kind === "MEAL" && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">{t("expenses.mealHint")}</p>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="fullDay" /> {t("expenses.fullDay")}</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="breakfast" /> {t("expenses.breakfast")}</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="lunch" /> {t("expenses.lunch")}</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="dinner" /> {t("expenses.dinner")}</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="fullDay" checked={fullDay} onChange={(event) => setFullDay(event.target.checked)} /> {t("expenses.fullDay")}</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="breakfast" checked={breakfast} onChange={(event) => setBreakfast(event.target.checked)} /> {t("expenses.breakfast")}</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="lunch" checked={lunch} onChange={(event) => setLunch(event.target.checked)} /> {t("expenses.lunch")}</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="dinner" checked={dinner} onChange={(event) => setDinner(event.target.checked)} /> {t("expenses.dinner")}</label>
           <p className="text-xs text-muted-foreground">{t("expenses.partialDay")}</p>
         </div>
       )}
+      {preview != null && <p className="text-sm font-medium tabular-nums">{t("expenses.returns", { amount: money(preview) })}</p>}
       <Button type="submit" size="sm" disabled={pending}>
         {pending && <Loader2 className="h-4 w-4 animate-spin" />}
         {t("expenses.addLine")}
@@ -412,22 +475,37 @@ function LineForm({ claimId }: { claimId: string }) {
   );
 }
 
-function TravelDialog() {
+function dateInputValue(iso: string) {
+  const date = calendarDate(iso);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function TravelDialog({
+  trip,
+}: {
+  trip?: { id: string; destination: string; purpose: string; startDate: string; endDate: string };
+}) {
   const { t } = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
+  const editing = Boolean(trip);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const payload = {
+      destination: String(data.get("destination") ?? ""),
+      purpose: String(data.get("purpose") ?? ""),
+      startDate: String(data.get("startDate") ?? ""),
+      endDate: String(data.get("endDate") ?? ""),
+    };
     start(async () => {
-      const result = await createTravelRequest({
-        destination: String(data.get("destination") ?? ""),
-        purpose: String(data.get("purpose") ?? ""),
-        startDate: String(data.get("startDate") ?? ""),
-        endDate: String(data.get("endDate") ?? ""),
-      });
+      const result = trip
+        ? await updateTravelRequest({ id: trip.id, ...payload })
+        : await createTravelRequest(payload);
       if (result.success) {
         toast.success(result.message);
         setOpen(false);
@@ -439,39 +517,45 @@ function TravelDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4" /> {t("expenses.request")}
-        </Button>
+        {editing ? (
+          <Button size="icon" variant="ghost" aria-label={t("expenses.edit")}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button>
+            <Plus className="h-4 w-4" /> {t("expenses.request")}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("expenses.requestTitle")}</DialogTitle>
-          <DialogDescription>{t("expenses.subtitle")}</DialogDescription>
+          <DialogTitle>{editing ? t("expenses.editTitle") : t("expenses.requestTitle")}</DialogTitle>
+          <DialogDescription>{editing ? t("expenses.editHint") : t("expenses.subtitle")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="destination">{t("expenses.destination")}</Label>
-            <Input id="destination" name="destination" required />
+            <Label htmlFor={editing ? `destination-${trip?.id}` : "destination"}>{t("expenses.destination")}</Label>
+            <Input id={editing ? `destination-${trip?.id}` : "destination"} name="destination" required defaultValue={trip?.destination} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="purpose">{t("expenses.purpose")}</Label>
-            <Textarea id="purpose" name="purpose" required />
+            <Label htmlFor={editing ? `purpose-${trip?.id}` : "purpose"}>{t("expenses.purpose")}</Label>
+            <Textarea id={editing ? `purpose-${trip?.id}` : "purpose"} name="purpose" required defaultValue={trip?.purpose} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="startDate">{t("leave.startDate")}</Label>
-              <Input id="startDate" name="startDate" type="date" required />
+              <Label htmlFor={editing ? `start-${trip?.id}` : "startDate"}>{t("leave.startDate")}</Label>
+              <Input id={editing ? `start-${trip?.id}` : "startDate"} name="startDate" type="date" required defaultValue={trip ? dateInputValue(trip.startDate) : undefined} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="endDate">{t("leave.endDate")}</Label>
-              <Input id="endDate" name="endDate" type="date" required />
+              <Label htmlFor={editing ? `end-${trip?.id}` : "endDate"}>{t("leave.endDate")}</Label>
+              <Input id={editing ? `end-${trip?.id}` : "endDate"} name="endDate" type="date" required defaultValue={trip ? dateInputValue(trip.endDate) : undefined} />
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
             <Button type="submit" disabled={pending}>
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t("expenses.request")}
+              {editing ? t("common.save") : t("expenses.request")}
             </Button>
           </DialogFooter>
         </form>

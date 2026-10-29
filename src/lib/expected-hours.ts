@@ -41,6 +41,34 @@ export function expectedWorkSeconds(from: Date, to: Date, dailySeconds: number, 
   return Math.round(total);
 }
 
+/** Hours still owed on one day after leave and paid holidays. */
+export function owedSecondsOnDay(weeklyHours: number, day: Date, daysOff: DayOff[]): number {
+  const dailySeconds = (weeklyHours / 5) * 3600;
+  const today = startOfDay(day);
+  return expectedWorkSeconds(today, today, dailySeconds, daysOff);
+}
+
+export function toDaysOff(
+  leaves: { type: string; dayPart: string; startDate: Date; endDate: Date }[],
+  holidays: { date: Date; endDate: Date | null }[],
+  from: Date,
+): DayOff[] {
+  return [
+    ...leaves.map((leave) => ({
+      start: leave.startDate,
+      end: leave.endDate,
+      fraction: leave.type === "HALF_DAY" || leave.dayPart !== "FULL" ? 0.5 : 1,
+    })),
+    ...holidays
+      .filter((holiday) => (holiday.endDate ?? holiday.date) >= from)
+      .map((holiday) => ({
+        start: holiday.date,
+        end: holiday.endDate ?? holiday.date,
+        fraction: 1,
+      })),
+  ];
+}
+
 /** "8h" or "7h 30m". Zero is "0h". */
 export function formatWorkTarget(seconds: number): string {
   if (seconds <= 0) return "0h";

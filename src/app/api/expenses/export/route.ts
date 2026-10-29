@@ -8,18 +8,13 @@ function cell(value: string | number): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user.employeeId || !hasPermission(session.user.role, "EXPENSE_APPROVE")) {
-    return new NextResponse("Forbidden", { status: 403 });
-  }
+type ClaimWithLines = {
+  employee: { firstName: string; lastName: string };
+  travelRequest: { destination: string; purpose: string; startDate: Date; endDate: Date };
+  lines: { spentOn: Date; kind: string; description: string; amountCents: number; kilometers: number | null }[];
+};
 
-  const claims = await prisma.expenseClaim.findMany({
-    where: { status: "APPROVED" },
-    include: { employee: true, travelRequest: true, lines: { orderBy: { spentOn: "asc" } } },
-    orderBy: { reviewedAt: "desc" },
-  });
-
+function toCsv(claims: ClaimWithLines[]): string {
   const header = [
     "Employee",
     "Destination",
@@ -54,11 +49,43 @@ export async function GET() {
       );
     }
   }
+  return rows.join("\n");
+}
 
-  return new NextResponse(rows.join("\n"), {
+function csvResponse(body: string, filename: string) {
+  return new NextResponse(body, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": "attachment; filename=\"expenses.csv\"",
+      "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
+}
+
+export async function GET(request: Request) {
+  const session = await auth();
+  if (!session?.user.employeeId) return new NextResponse("Forbidden", { status: 403 });
+
+  const claimId = new URL(request.url).searchParams.get("claimId");
+  const boss = hasPermission(session.user.role, "EXPENSE_APPROVE");
+
+  if (claimId) {
+    const claim = await prisma.expenseClaim.findUnique({
+      where: { id: claimId },
+      include: { employee: true, travelRequest: true, lines: { orderBy: { spentOn: "asc" } } },
+    });
+    if (!claim) return new NextResponse("Not found", { status: 404 });
+    if (claim.employeeId !== session.user.employeeId && !boss) return new NextResponse("Forbidden", { status: 403 });
+    const slug = claim.travelRequest.destination.replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "claim";
+    return csvResponse(toCsv([claim]), `expenses-${slug}.csv`);
+  }
+
+  if (!boss) return new NextResponse("Forbidden", { status: 403 });
+
+  const claims = await prisma.expenseClaim.findMany({
+    where: { status: "APPROVED" },
+    include: { employee: true, travelRequest: true, lines: { orderBy: { spentOn: "asc" } } },
+    orderBy: { reviewedAt: "desc" },
+  });
+
+  return csvResponse(toCsv(claims), "expenses.csv");
 }

@@ -26,6 +26,66 @@ export function localizeNotification(
 ): { title: string; message: string } {
   if (locale === "en") return { title: item.title, message: item.message };
 
+  if (item.title === "Clock in reminder") {
+    return {
+      title: translate(locale, "notifications.clockInTitle"),
+      message: translate(locale, "notifications.clockInMessage"),
+    };
+  }
+  if (item.title === "Clock out reminder") {
+    return {
+      title: translate(locale, "notifications.remindOutTitle"),
+      message: translate(locale, "notifications.remindOutMessage"),
+    };
+  }
+  if (item.title === "Break reminder") {
+    return {
+      title: translate(locale, "notifications.breakTitle"),
+      message: translate(locale, "notifications.breakMessage"),
+    };
+  }
+
+  const expenseSubmittedTitle = /^Expense claim — (.+)$/.exec(item.title);
+  const expenseSubmitted = /^(.+) submitted expenses for (.+)\.$/.exec(item.message);
+  if (expenseSubmittedTitle && expenseSubmitted) {
+    return {
+      title: translate(locale, "notifications.expenseTitle", { name: expenseSubmittedTitle[1] }),
+      message: translate(locale, "notifications.expenseMessage", {
+        name: expenseSubmitted[1],
+        destination: expenseSubmitted[2],
+      }),
+    };
+  }
+
+  if (item.title === "Expense claim approved" || item.title === "Expense claim rejected") {
+    const approved = item.title === "Expense claim approved";
+    const body = /^(.+): your expenses were (approved|rejected)\.$/.exec(item.message);
+    return {
+      title: translate(locale, approved ? "notifications.expenseApprovedTitle" : "notifications.expenseRejectedTitle"),
+      message: body
+        ? translate(locale, approved ? "notifications.expenseApproved" : "notifications.expenseRejected", {
+            destination: body[1],
+          })
+        : item.message,
+    };
+  }
+
+  if (item.title === "Overtime warning") {
+    return {
+      title: translate(locale, "notifications.selfOvertimeTitle"),
+      message: translate(locale, "notifications.selfOvertimeMessage"),
+    };
+  }
+
+  const clockOutTitle = /^Clocked out — (.+)$/.exec(item.title);
+  const clockOutMessage = /^(.+) was clocked out after 2 hours of overtime\.$/.exec(item.message);
+  if (clockOutTitle && clockOutMessage) {
+    return {
+      title: translate(locale, "notifications.clockOutTitle", { name: clockOutTitle[1] }),
+      message: translate(locale, "notifications.clockOutMessage", { name: clockOutMessage[1] }),
+    };
+  }
+
   const overtimeTitle = /^Overtime alert — (.+)$/.exec(item.title);
   const overtimeMessage = /^(.+) logged (.+) overtime today\.$/.exec(item.message);
   if (overtimeTitle && overtimeMessage) {

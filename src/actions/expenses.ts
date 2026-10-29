@@ -3,6 +3,7 @@
 import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { revalidatePath } from "next/cache";
+import { notifyAdminsOfExpenseClaim } from "@/lib/notifications";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
@@ -124,6 +125,49 @@ export async function reviewTravelRequest(input: {
   }
 }
 
+export async function updateTravelRequest(input: {
+  id: string;
+  destination: string;
+  purpose: string;
+  startDate: string;
+  endDate: string;
+}): Promise<ActionResult> {
+  try {
+    const session = await auth();
+    if (!session?.user.employeeId) return { success: false, error: "Not authenticated" };
+
+    const destination = input.destination.trim();
+    const purpose = input.purpose.trim();
+    const start = parseDateInput(input.startDate);
+    const end = parseDateInput(input.endDate);
+    if (!destination || !purpose) return { success: false, error: "Add a destination and a purpose." };
+    if (!start || !end || end < start) return { success: false, error: "Choose a valid date range." };
+
+    const travel = await prisma.travelRequest.findUnique({
+      where: { id: input.id },
+      include: { claim: { include: { lines: true } } },
+    });
+    const boss = hasPermission(session.user.role, "EXPENSE_APPROVE");
+    if (!travel || (travel.employeeId !== session.user.employeeId && !boss)) {
+      return { success: false, error: "Trip not found." };
+    }
+    if (travel.claim && travel.claim.status !== "DRAFT" && travel.claim.status !== "REJECTED") {
+      return { success: false, error: "This trip can no longer be edited." };
+    }
+    const outside = travel.claim?.lines.some((line) => !onTrip(line.spentOn, start, end)) ?? false;
+    if (outside) return { success: false, error: "Some expenses fall outside these dates. Remove them first." };
+
+    await prisma.travelRequest.update({
+      where: { id: travel.id },
+      data: { destination, purpose, startDate: start, endDate: end },
+    });
+    revalidate();
+    return { success: true, message: "Trip updated." };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "Failed to update the trip" };
+  }
+}
+
 export async function deleteTravelRequest(id: string): Promise<ActionResult> {
   try {
     const session = await auth();
@@ -135,6 +179,12 @@ export async function deleteTravelRequest(id: string): Promise<ActionResult> {
     const boss = hasPermission(session.user.role, "EXPENSE_APPROVE");
     if (!travel || (travel.employeeId !== session.user.employeeId && !boss)) {
       return { success: false, error: "Trip not found." };
+    }
+    if (travel.claim?.status === "PENDING") {
+      return { success: false, error: "A submitted claim cannot be deleted. Take it back first." };
+    }
+    if (travel.claim?.status === "APPROVED") {
+      return { success: false, error: "An approved claim cannot be deleted." };
     }
     const receipts = travel.claim?.lines.map((line) => line.receiptPath).filter((file): file is string => Boolean(file)) ?? [];
     await prisma.travelRequest.delete({ where: { id } });
@@ -264,14 +314,37 @@ export async function submitExpenseClaim(claimId: string): Promise<ActionResult>
     if (!claim || claim.employeeId !== session.user.employeeId) return { success: false, error: "Expense claim not found." };
     if (claim.status !== "DRAFT" && claim.status !== "REJECTED") return { success: false, error: "This claim was already submitted." };
     if (claim.lines.length === 0) return { success: false, error: "Add at least one expense first." };
-    await prisma.expenseClaim.update({
+    const submitted = await prisma.expenseClaim.update({
       where: { id: claimId },
       data: { status: "PENDING", submittedAt: new Date(), reviewComment: null },
+      include: { employee: true, travelRequest: true },
+    });
+    await notifyAdminsOfExpenseClaim({
+      employeeName: `${submitted.employee.firstName} ${submitted.employee.lastName}`,
+      destination: submitted.travelRequest.destination,
     });
     revalidate();
     return { success: true, message: "Expense claim submitted." };
   } catch (err: any) {
     return { success: false, error: err.message ?? "Failed to submit the claim" };
+  }
+}
+
+export async function withdrawExpenseClaim(claimId: string): Promise<ActionResult> {
+  try {
+    const session = await auth();
+    if (!session?.user.employeeId) return { success: false, error: "Not authenticated" };
+    const claim = await prisma.expenseClaim.findUnique({ where: { id: claimId } });
+    if (!claim || claim.employeeId !== session.user.employeeId) return { success: false, error: "Expense claim not found." };
+    if (claim.status !== "PENDING") return { success: false, error: "Only a submitted claim can be taken back." };
+    await prisma.expenseClaim.update({
+      where: { id: claimId },
+      data: { status: "DRAFT", submittedAt: null, reviewComment: null },
+    });
+    revalidate();
+    return { success: true, message: "Claim returned to draft." };
+  } catch (err: any) {
+    return { success: false, error: err.message ?? "Failed to take the claim back" };
   }
 }
 

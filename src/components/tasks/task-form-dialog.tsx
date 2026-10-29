@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocale } from "@/components/layout/locale-provider";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/i18n/app-toast";
 import { Loader2, Plus } from "lucide-react";
 import { taskSchema, type TaskInput } from "@/lib/validations/tasks";
 import { createTask } from "@/actions/tasks";
@@ -206,7 +206,7 @@ export function TaskFormDialog({
             </div>
             <div className="space-y-1.5 sm:col-span-2 sm:max-w-[calc(50%-0.5rem)]">
               <Label htmlFor="estimatedHours">{t("tasks.field.estimate")}</Label>
-              <Input id="estimatedHours" type="number" step="0.5" min={0.25} {...register("estimatedHours")} />
+              <Input id="estimatedHours" type="number" step="0.25" min={0.25} {...register("estimatedHours")} />
             </div>
           </div>
 
